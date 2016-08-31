@@ -2,8 +2,6 @@
 set(list_C_SRCS "list.c")
 set(argparse_C_SRCS "argparse.c")
 
-include_directories("../include")
-
 # static targets
 add_library(list STATIC ${list_C_SRCS})
 add_library(argparse STATIC ${argparse_C_SRCS})

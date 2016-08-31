@@ -14,4 +14,6 @@ endif ()
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror -Wall -DENABLE_OUTPUT")
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -DDEBUG -DENABLE_OUTPUT")
 
+include_directories("include")
+
 add_subdirectory("src")
