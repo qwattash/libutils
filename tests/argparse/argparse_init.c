@@ -1,5 +1,10 @@
 
-#include "argparse_test.h"
+#include <stdarg.h>
+#include <stddef.h>
+#include <setjmp.h>
+#include <cmocka.h>
+
+#include "argparse.h"
 
 static void
 test_ap_init_destroy(void **state)

@@ -14,25 +14,6 @@
 #ifndef ARGPARSE_TEST_H
 #define ARGPARSE_TEST_H
 
-#define TEST_MAIN(f)					\
-  int main(int argc, char *argv[])			\
-  {							\
-    const struct CMUnitTest tests[] = {			\
-      cmocka_unit_test(f, ap_setup, ap_teardown);	\
-    };							\
-    cmocka_run_group_tests(tests, NULL, NULL);		\
-  }
-
-#define TEST_MAIN_SETUP(f)				\
-  int main(int argc, char *argv[])			\
-  {							\
-    const struct CMUnitTest tests[] = {			\
-      cmocka_unit_test(f, ap_setup, ap_teardown);	\
-    };							\
-    cmocka_run_group_tests(tests, NULL, NULL);		\
-  }
-  
-
 static int
 ap_setup(void **state)
 {
