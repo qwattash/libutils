@@ -8,5 +8,7 @@ foreach (TEST_SRC ${argparse_TEST_SRCS})
   target_include_directories(${TEST} PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_SOURCE_DIR}/include")
+  set_target_properties(${TEST} PROPERTIES
+    COMPILE_FLAGS "-Wno-unused-function")
   target_link_libraries(${TEST} list argparse cmocka)
 endforeach ()
