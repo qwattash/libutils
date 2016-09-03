@@ -171,6 +171,7 @@ static int argparse_find_subcommand(void *data, void *args);
 static int argparse_next_subcmd(struct argparse_parser_state *st);
 static int argparse_prev_subcmd(struct argparse_parser_state *st);
 static int argparse_finalize_subcmd(struct argparse_parser_state *st);
+static int argparse_finalize_pop_subcmd(struct argparse_parser_state *st);
 
 
 
@@ -1079,6 +1080,25 @@ argparse_finalize_subcmd(struct argparse_parser_state *st)
   return 0;
 }
 
+/** 
+ * Perform finalization operations after the last argument
+ * for the current subcommand is parsed.
+ */
+static int
+argparse_finalize_pop_subcmd(struct argparse_parser_state *st)
+{
+  int error;
+  
+  log_debug("Finalize subcommand %s\n", st->current_cmd->subcommand_name);
+  error = argparse_finalize_subcmd(st);
+  if (error)
+    return error;
+  error = argparse_prev_subcmd(st);
+  if (error)
+    return error;
+  return 0;
+}
+
 int
 argparse_parse(argparse_t ap, int argc, char *argv[])
 {
@@ -1107,6 +1127,8 @@ argparse_parse(argparse_t ap, int argc, char *argv[])
     if (arg[0] == '-') {
       log_debug("named arg %s for %s\n", arg, curr_ap->subcommand_name);
       error = argparse_parse_arg_named(&state);
+      if (error)
+	goto err_dealloc;
     }
     else if (!state.last_subcmd &&
 	     list_length(curr_ap->subcommands) > 0) {
@@ -1122,18 +1144,10 @@ argparse_parse(argparse_t ap, int argc, char *argv[])
       error = argparse_parse_posarg(&state);
       if (error)
 	goto err_dealloc;
-      
+
       if (list_length(curr_ap->pos_options) == curr_ap->curr_posarg) {
-	log_debug("end of posargs for %s\n", curr_ap->subcommand_name);
-	/* if there are no more posargs for this parser we should pop 
-	 * and perform finalization checks
-	 */
-	error = argparse_finalize_subcmd(&state);
-	if (error)
-	  goto err_dealloc;
-	error = argparse_prev_subcmd(&state);
-	if (error)
-	  goto err_dealloc;
+	/* this is the last posarg, finalize */
+	error = argparse_finalize_pop_subcmd(&state);
 	/* need to update this since prev_subcmd changed the current parser */
 	curr_ap = state.current_cmd;
       }
@@ -1142,6 +1156,13 @@ argparse_parse(argparse_t ap, int argc, char *argv[])
     if (error)
       goto err_dealloc;
   }
+  
+  while (state.current_cmd != state.root_cmd) {
+    error = argparse_finalize_pop_subcmd(&state);
+    if (error) {
+      goto err_dealloc;
+    }
+  }
 
   /* make sure that we are exiting the loop in a consistent state */
   assert(state.current_cmd == state.root_cmd);
@@ -1149,7 +1170,7 @@ argparse_parse(argparse_t ap, int argc, char *argv[])
   error = argparse_finalize_subcmd(&state);
   if (error)
     goto err_dealloc;
-  
+
   list_destroy(state.subcmd_stack);
   return 0;
 
