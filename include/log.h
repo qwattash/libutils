@@ -1,42 +1,87 @@
 #ifndef LOG_H
 #define LOG_H
 
-#include <stdio.h>
-#include <stdarg.h>
+#include <stdlib.h>
 
-#ifdef ENABLE_OUTPUT
+struct logger_handle;
 
-static inline void
-_log_info(const char *fmt, ...)
-{
-  va_list va;
-  va_start(va, fmt);
-  vfprintf(stdout, fmt, va);
-  va_end(va);
-}
+/**
+ * Opaque logger handle
+ */
+typedef struct logger_handle * logger_t;
 
-static inline void
-_log_err(const char *fmt, ...)
-{
-  va_list va;
-  va_start(va, fmt);
-  vfprintf(stderr, fmt, va);
-  va_end(va);
-}
+/**
+ * Log level
+ */
+enum log_level {
+  LOG_DEBUG = 0,
+  LOG_INFO = 1,
+  LOG_WARNING = 2,
+  LOG_ERROR = 3,
+  LOG_MSG = 4,
+  LOG_NONE = 5,
+};
 
-#define log_info(fmt, ...) _log_info(fmt, ##__VA_ARGS__)
-#define log_err(fmt, ...) _log_err(fmt, ##__VA_ARGS__)
-#if DEBUG
-#define log_debug(fmt, ...) _log_err(fmt, ##__VA_ARGS__)
-#else
+/* private logging functions - use macros */
+void _log_config(logger_t logger, enum log_level lvl, const char *prefix);
+void _log_stdout(logger_t logger, enum log_level lvl,
+		 const char *fmt, ...);
+void _log_stderr(logger_t logger, enum log_level lvl,
+		 const char *fmt, ...);
+logger_t _logger_init(void);
+
+#ifdef ENABLE_LOGGING
+
+#ifdef LOG_NODEBUG
 #define log_debug(fmt, ...)
-#endif /* DEBUG */
+#define xlog_debug(logger, fmt, ...)
+#else /* ! LOG_NODEBUG */
+#define log_debug(fmt, ...) _log_stdout(NULL, LOG_DEBUG, fmt, ##__VA_ARGS__)
+#define xlog_debug(logger, fmt, ...)			\
+  _log_stdout(logger, LOG_DEBUG, fmt, ##__VA_ARGS__)
+#endif /* ! LOG_NODEBUG */
 
-#else /* ! ENABLE_OUTPUT */
+#define log_info(fmt, ...) _log_stdout(NULL, LOG_INFO, fmt, ##__VA_ARGS__)
+#define log_warn(fmt, ...) _log_stdout(NULL, LOG_WARNING, fmt, ##__VA_ARGS__)
+#define log_err(fmt, ...) _log_stderr(NULL, LOG_ERROR, fmt, ##__VA_ARGS__)
+#define log_msg(fmt, ...) _log_stdout(NULL, LOG_MSG, fmt, ##__VA_ARGS__)
 
+#define xlog_info(logger, fmt, ...)			\
+  _log_stdout(logger, LOG_INFO, fmt, ##__VA_ARGS__)
+#define xlog_warn(logger, fmt, ...)			\
+  _log_stdout(logger, LOG_WARNING, fmt, ##__VA_ARGS__)
+#define xlog_err(logger, fmt, ...)			\
+  _log_stderr(logger, LOG_ERROR, fmt, ##__VA_ARGS__)
+#define xlog_msg(logger, fmt, ...)			\
+  _log_stdout(logger, LOG_MSG, fmt, ##__VA_ARGS__)
+
+#define log_config(logger, lvl, prefix) _log_config(logger, lvl, prefix)
+
+/* avoid warning for unused variables when disabling logging */
+#define logger_init(name) logger_t name = _logger_init()
+
+#define logger_free(name) free(name)
+
+#else /* ! ENABLE_LOGGING */
+
+#define log_debug(fmt, ...)
 #define log_info(fmt, ...)
+#define log_warn(fmt, ...)
 #define log_err(fmt, ...)
-#define log_debug(fmt, ...)
-#endif /* ! ENABLE_OUTPUT */
+#define log_msg(fmt, ...)
 
-#endif
+#define xlog_debug(logger, fmt, ...)
+#define xlog_info(logger, fmt, ...)
+#define xlog_warn(logger, fmt, ...)
+#define xlog_err(logger, fmt, ...)
+#define xlog_msg(logger, fmt, ...)
+
+#define log_config(logger, lvl, prefix)
+
+/* avoid warning for unused variables when disabling logging */
+#define logger_init(name)
+#define logger_free(name)
+
+#endif /* ! ENABLE_LOGGING*/
+
+#endif /* LOG_H */
