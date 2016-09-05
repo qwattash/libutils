@@ -289,6 +289,38 @@ test_ap_nested_parser_success(void **state)
   argparse_destroy(ap);
 }
 
+static void
+test_ap_nested_parser_posargs_success(void **state)
+{
+  argparse_t ap, c1, c2;
+  int err;
+  char strarg[64];
+
+  char *argv[] = {"./a.out", "cmd1", "cmd2", "posarg1", "posarg2"};
+  err = argparse_init(&ap, "Test parser", NULL);
+  assert_int_equal(err, 0);
+
+  c1 = argparse_subcmd_add(ap, "cmd1", "Command 1", NULL);
+  c2 = argparse_subcmd_add(c1, "cmd2", "Command 2", NULL);
+
+  err = argparse_posarg_add(c2, "pos1", T_STRING, "");
+  assert_int_equal(err, 0);
+  err = argparse_posarg_add(c2, "pos2", T_STRING, "");
+  assert_int_equal(err, 0);
+  
+  err = argparse_parse(ap, 5, argv);
+  assert_int_equal(err, 0);
+
+  err = argparse_posarg_get(c2, 0, strarg, 64);
+  assert_int_equal(err, 0);
+  assert_string_equal(strarg, "posarg1");
+  err = argparse_posarg_get(c2, 1, strarg, 64);
+  assert_int_equal(err, 0);
+  assert_string_equal(strarg, "posarg2");
+
+  argparse_destroy(ap);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -304,6 +336,7 @@ main(int argc, char *argv[])
     				    ap_setup,
 				    ap_teardown),
     cmocka_unit_test(test_ap_nested_parser_success),
+    cmocka_unit_test(test_ap_nested_parser_posargs_success),
     cmocka_unit_test(test_posargs_only_in_subcmd),
   };
   return cmocka_run_group_tests(tests, NULL, NULL);
