@@ -10,5 +10,5 @@ foreach (TEST_SRC ${argparse_TEST_SRCS})
     "${CMAKE_SOURCE_DIR}/include")
   set_target_properties(${TEST} PROPERTIES
     COMPILE_FLAGS "-Wno-unused-function")
-  target_link_libraries(${TEST} list argparse cmocka)
+  target_link_libraries(${TEST} utils cmocka)
 endforeach ()
