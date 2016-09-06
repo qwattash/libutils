@@ -5,11 +5,6 @@
 
 #include "log.h"
 
-struct logger_handle {
-  enum log_level level;
-  const char *prefix;
-};
-
 /**
  * Configure logging parameters
  */

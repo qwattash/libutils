@@ -3,13 +3,6 @@
 
 #include <stdlib.h>
 
-struct logger_handle;
-
-/**
- * Opaque logger handle
- */
-typedef struct logger_handle * logger_t;
-
 /**
  * Log level
  */
@@ -21,6 +14,20 @@ enum log_level {
   LOG_MSG = 4,
   LOG_NONE = 5,
 };
+
+/**
+ * Internal logger handle representation.
+ * This is useful for static initialization of the logger.
+ */
+struct logger_handle {
+  enum log_level level;
+  const char *prefix;
+};
+
+/**
+ * Shorthand logger handle type
+ */
+typedef struct logger_handle * logger_t;
 
 /* private logging functions - use macros */
 void _log_config(logger_t logger, enum log_level lvl, const char *prefix);
@@ -58,7 +65,6 @@ logger_t _logger_init(void);
 #define log_config(logger, lvl, prefix) _log_config(logger, lvl, prefix)
 
 /* avoid warning for unused variables when disabling logging */
-#define LOGGER_HANDLE(name) logger_t name = NULL;
 #define logger_init(name) name = _logger_init()
 #define logger_free(name) free(name)
 
@@ -79,7 +85,6 @@ logger_t _logger_init(void);
 #define log_config(logger, lvl, prefix)
 
 /* avoid warning for unused variables when disabling logging */
-#define LOGGER_HANDLE(name)
 #define logger_init(name)
 #define logger_free(name)
 
