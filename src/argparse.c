@@ -11,6 +11,19 @@
 #include "argparse.h"
 #include "log.h"
 
+/* logger */
+#ifdef ENABLE_LOGGING
+static struct logger_handle _logger = {
+#ifdef DEBUG
+  .level = LOG_DEBUG,
+#else /* ! DEBUG */
+  .level = LOG_ERROR,
+#endif /* ! DEBUG */
+  .prefix = "[argparse] ",
+};
+#define logger &_logger
+#endif
+
 struct argparse_item;
 struct argparse_option;
 struct argparse_handle;
@@ -233,7 +246,7 @@ argparse_subcommand_dtor(void *data)
   int error = 0;
 
   /* NOTE: sub->subcommands is destroyed by argparse_destroy_subcmd */
-  log_debug("Destroy %s\n", sub->subcommand_name);
+  xlog_debug(logger, "Destroy %s\n", sub->subcommand_name);
   error = list_destroy(sub->args);
   error |= list_destroy(sub->pos_args);
   error |= list_destroy(sub->options);
@@ -477,9 +490,10 @@ argparse_help_option(void *data, void *args)
   struct argparse_option *opt = data;
 
   if (opt->shortname == '\0')
-    log_info("\t--%s\t\t%s\n", opt->name, opt->help);
+    xlog_msg(logger, "\t--%s\t\t%s\n", opt->name, opt->help);
   else
-    log_info("\t-%c,--%s\t\t%s\n", opt->shortname, opt->name, opt->help);
+    xlog_msg(logger, "\t-%c,--%s\t\t%s\n", opt->shortname,
+	     opt->name, opt->help);
   return 0;
 }
 
@@ -492,7 +506,7 @@ argparse_help_posoption(void *data, void *args)
 {
   struct argparse_option *opt = data;
 
-  log_info("\t%s\t\t\t%s\n", opt->name, opt->help);
+  xlog_msg(logger, "\t%s\t\t\t%s\n", opt->name, opt->help);
   return 0;
 }
 
@@ -505,7 +519,7 @@ argparse_help_subcommand(void *data, void *args)
 {
   struct argparse_handle *ap = data;
 
-  log_info("\t%s\t\t%s\n", ap->subcommand_name, ap->subcommand_help);
+  xlog_msg(logger, "\t%s\t\t%s\n", ap->subcommand_name, ap->subcommand_help);
   return 0;
 }
 
@@ -535,19 +549,19 @@ argparse_subcommand_helpmsg(argparse_t ap)
 {
   if (ap->subcommand_name == NULL)
     /* root subcommand */
-    log_info("Usage: %s [options] [subcommands] [arguments]\n",
+    xlog_msg(logger, "Usage: %s [options] [subcommands] [arguments]\n",
 	     ap->bin_name);
   else
-    log_info("Command: %s [options] [subcommands] [arguments]\n%s\n",
+    xlog_msg(logger, "Command: %s [options] [subcommands] [arguments]\n%s\n",
 	     ap->subcommand_name, ap->subcommand_help);
   /* print help for each option */
-  log_info("Subcommands:\n");
+  xlog_msg(logger, "Subcommands:\n");
   list_walk(ap->subcommands, argparse_help_subcommand, NULL);
-  log_info("Options:\n");
+  xlog_msg(logger, "Options:\n");
   list_walk(ap->options, argparse_help_option, NULL);
-  log_info("\nArguments:\n");
+  xlog_msg(logger, "\nArguments:\n");
   list_walk(ap->pos_options, argparse_help_posoption, NULL);
-  log_info("\n\n");
+  xlog_msg(logger, "\n\n");
 }
 
 /**
@@ -620,7 +634,7 @@ argparse_destroy(argparse_t ap)
    * that all destructors return zero
    */
   assert(ap != NULL);
-  log_debug("Destroy root %s\n", ap->subcommand_name);
+  xlog_debug(logger, "Destroy root %s\n", ap->subcommand_name);
   error = list_walk(ap->subcommands, argparse_destroy_subcmd, NULL);
   error |= list_destroy(ap->subcommands);
   error |= argparse_subcommand_dtor(ap);
@@ -807,8 +821,8 @@ argparse_parseopt(struct argparse_item *item, char *arg)
   case T_INT:
     item->int_arg = strtol(arg, &int_arg_end, 10);
     if (int_arg_end == arg) {
-      log_err("Invalid type of %s for argument %s (int)\n",
-	      arg, item->opt->name);
+      xlog_err(logger, "Invalid type of %s for argument %s (int)\n",
+	       arg, item->opt->name);
       error = E_PARSE;
     }
     break;
@@ -834,7 +848,7 @@ argparse_parse_posarg(struct argparse_parser_state *st)
   opt = list_getitem(ap->pos_options, ap->curr_posarg);
 
   if (opt == NULL) {
-    log_err("Extra positional argument %s\n", arg);
+    xlog_err(logger, "Extra positional argument %s\n", arg);
     argparse_helpmsg(st->root_cmd);
     return E_PARSE;
   }
@@ -882,7 +896,7 @@ argparse_parse_arg_named(struct argparse_parser_state *st)
     is_longopt = 0;
 
   if (*arg == '\0') {
-    log_err("Invalid option -\n");
+    xlog_err(logger, "Invalid option -\n");
     argparse_helpmsg(st->root_cmd);
     return E_PARSE;
   }
@@ -901,7 +915,7 @@ argparse_parse_arg_named(struct argparse_parser_state *st)
   if (error < 0)
     return (error);
   if (cmp_args.data == NULL) {
-    log_err("Invalid option -%s\n", arg);
+    xlog_err(logger, "Invalid option -%s\n", arg);
     argparse_helpmsg(st->root_cmd);
     return E_PARSE;
   }
@@ -946,11 +960,11 @@ argparse_check_required(struct argparse_parser_state *st)
   struct argparse_handle *ap = st->current_cmd;
   
   num_opts = list_length(ap->pos_options);
-  log_debug("check required opts for %s\n", ap->subcommand_name);
+  xlog_debug(logger, "check required opts for %s\n", ap->subcommand_name);
   if (ap->curr_posarg != num_opts) {
     if (ap->curr_posarg < num_opts) {
       opt = list_getitem(ap->pos_options, ap->curr_posarg);
-      log_err("Missing argument %s\n", opt->name);
+      xlog_err(logger, "Missing argument %s\n", opt->name);
       argparse_helpmsg(st->root_cmd);
     }
     return E_PARSE;
@@ -965,7 +979,7 @@ argparse_check_required(struct argparse_parser_state *st)
       return 0;
     else {
       /* missing item found */
-      log_err("Missing required argument %s\n", cmp_args.opt->name);
+      xlog_err(logger, "Missing required argument %s\n", cmp_args.opt->name);
       argparse_helpmsg(st->root_cmd);
       return E_PARSE;
     }
@@ -986,7 +1000,7 @@ argparse_fixup_flags(struct argparse_parser_state *st)
   struct argparse_add_unset_flag_args walk_args;
   struct argparse_handle *ap = st->current_cmd;
 
-  log_debug("fixup flags for %s\n", ap->subcommand_name);
+  xlog_debug(logger, "fixup flags for %s\n", ap->subcommand_name);
   walk_args.ap = ap;
 
   /* iterate over flag options, if an argument is not specified for them,
@@ -1013,10 +1027,10 @@ argparse_next_subcmd(struct argparse_parser_state *st)
   error = list_walk(st->current_cmd->subcommands,
 		    argparse_find_subcommand,
 		    &args);
-  log_debug("subcommand switch %s -> %s @ %p\n", st->current_cmd->subcommand_name,
-	   args.name, args.match);
+  xlog_debug(logger, "subcommand switch %s -> %s @ %p\n",
+	     st->current_cmd->subcommand_name, args.name, args.match);
   if (error < 0 || args.match == NULL) {
-    log_err("Invalid command %s\n", args.name);
+    xlog_err(logger, "Invalid command %s\n", args.name);
     return E_PARSE;
   }
   error = list_push(st->subcmd_stack, st->current_cmd);
@@ -1044,11 +1058,11 @@ argparse_prev_subcmd(struct argparse_parser_state *st)
   curr_ap = list_pop(st->subcmd_stack);
   if (curr_ap == NULL) {
     /* something wrong happened, break */
-    log_err("Error popping subcommand from stack\n");
+    xlog_err(logger, "Error popping subcommand from stack\n");
     return E_PARSE;
   }
 
-  log_debug("pop back cmd %s\n", curr_ap->subcommand_name);
+  xlog_debug(logger, "pop back cmd %s\n", curr_ap->subcommand_name);
   st->current_cmd = curr_ap;
   return 0;
 }
@@ -1089,7 +1103,7 @@ argparse_finalize_pop_subcmd(struct argparse_parser_state *st)
 {
   int error;
   
-  log_debug("Finalize subcommand %s\n", st->current_cmd->subcommand_name);
+  xlog_debug(logger, "Finalize subcommand %s\n", st->current_cmd->subcommand_name);
   error = argparse_finalize_subcmd(st);
   if (error)
     return error;
@@ -1122,10 +1136,11 @@ argparse_parse(argparse_t ap, int argc, char *argv[])
   while (state.index < argc) {
     curr_ap = state.current_cmd;
     arg = argv[state.index];
-    log_debug("pick %s\n", arg);
+    xlog_debug(logger, "pick %s\n", arg);
     /* index is updated in the parser functions */
     if (arg[0] == '-') {
-      log_debug("named arg %s for %s\n", arg, curr_ap->subcommand_name);
+      xlog_debug(logger, "named arg %s for %s\n",
+		 arg, curr_ap->subcommand_name);
       error = argparse_parse_arg_named(&state);
       if (error)
 	goto err_dealloc;
@@ -1133,14 +1148,15 @@ argparse_parse(argparse_t ap, int argc, char *argv[])
     else if (!state.last_subcmd &&
 	     list_length(curr_ap->subcommands) > 0) {
       /* switch to next subcommand */
-      log_debug("subcommand switch %s for %s\n", arg, curr_ap->subcommand_name);
+      xlog_debug(logger, "subcommand switch %s for %s\n",
+		 arg, curr_ap->subcommand_name);
       error = argparse_next_subcmd(&state);
     }
     else {
       if (list_length(curr_ap->subcommands) == 0)
 	state.last_subcmd = true;
       
-      log_debug("posarg %s for %s\n", arg, curr_ap->subcommand_name);
+      xlog_debug(logger, "posarg %s for %s\n", arg, curr_ap->subcommand_name);
       error = argparse_parse_posarg(&state);
       if (error)
 	goto err_dealloc;
