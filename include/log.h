@@ -58,8 +58,8 @@ logger_t _logger_init(void);
 #define log_config(logger, lvl, prefix) _log_config(logger, lvl, prefix)
 
 /* avoid warning for unused variables when disabling logging */
-#define logger_init(name) logger_t name = _logger_init()
-
+#define LOGGER_HANDLE(name) logger_t name = NULL;
+#define logger_init(name) name = _logger_init()
 #define logger_free(name) free(name)
 
 #else /* ! ENABLE_LOGGING */
@@ -79,6 +79,7 @@ logger_t _logger_init(void);
 #define log_config(logger, lvl, prefix)
 
 /* avoid warning for unused variables when disabling logging */
+#define LOGGER_HANDLE(name)
 #define logger_init(name)
 #define logger_free(name)
 

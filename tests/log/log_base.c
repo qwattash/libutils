@@ -226,7 +226,8 @@ xlog_setup(void **state)
   struct xlog_state *st = malloc(sizeof(struct xlog_state));
   assert(st != NULL);
 
-  logger_init(logger);
+  LOGGER_HANDLE(logger); /* define logger */
+  logger_init(logger); /* init logger */
   st->logger = logger;
   st->debug.fd = stdout;
   st->debug.message = "debug message %d";
