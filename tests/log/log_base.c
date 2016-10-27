@@ -10,56 +10,126 @@
 
 #include "log.h"
 
-struct expect_print {
+struct expect {
   FILE *fd;
+  const char *prefix;
   const char *message;
   int argument;
+
+  /* file backend stuff */
+  const char *log_file_path;
+  const char *log_file_mode;
 };
 
-/* stuff initialized by xlog_setup */
+/* 
+ * stuff initialized by xlog_setup with expected 
+ * values of parameters to mocked functions
+*/
 struct xlog_state {
-  logger_t logger;
-  struct expect_print debug;
-  struct expect_print info;
-  struct expect_print warn;
-  struct expect_print err;
-  struct expect_print msg;
-  struct expect_print prefix;
-  struct expect_print err_prefix;
+  struct logger_handle logger;
+  struct expect result;
 };
+  
+/*
+ * mock FILE * returned by fopen
+ */
+FILE *mock_fd = (FILE*) 0x1000;
 
+static void mock_setup(struct xlog_state *st, int lvl);
+
+/*
+ * mock fprintf
+ */
 int
 __wrap_fprintf(FILE *fd, const char *fmt, ...)
 {
-  struct expect_print *expect;
+  struct expect *result;
 
-  expect = mock_ptr_type(struct expect_print *);
+  result = mock_ptr_type(struct expect *);
 
-  assert_ptr_equal(fd, expect->fd);
-  assert_string_equal(fmt, expect->message);
+  assert_ptr_equal(fd, result->fd);
+  assert_string_equal(fmt, result->prefix);
   return strlen(fmt);
 }
 
+/*
+ * mock vfprintf
+ */
 int
 __wrap_vfprintf(FILE *fd, const char *fmt, va_list va)
 {
-  struct expect_print *expect;
+  struct expect *result;
   char buffer[1024]; /* enough for tests */
   int arg;
-  expect = mock_ptr_type(struct expect_print *);
-
-  assert_ptr_equal(fd, expect->fd);
-  assert_string_equal(fmt, expect->message);
+  result = mock_ptr_type(struct expect *);
+  
+  assert_ptr_equal(fd, result->fd);
+  assert_string_equal(fmt, result->message);
   arg = va_arg(va, int);
-  assert_int_equal(arg, expect->argument);
+  assert_int_equal(arg, result->argument);
 
   return vsprintf(buffer, fmt, va);
 }
 
+/*
+ * mock fopen for file logging
+ */
+FILE*
+__wrap_fopen(const char *path, const char *mode)
+{
+  struct expect *result;
+
+  result = mock_ptr_type(struct expect *);
+  
+  assert_string_equal(path, result->log_file_path);
+  assert_string_equal(mode, result->log_file_mode);
+  return mock_fd;
+}
+
+#ifdef LINUX
+/*
+ * mock syslog open file
+ */
+void
+__wrap_openlog(const char *ident, int opts, int facility)
+{
+  
+  mock_ptr_type(struct expect *);
+  assert_ptr_equal(ident, NULL);
+  assert_int_equal(opts, 0);
+  assert_int_equal(facility, LOG_DAEMON);
+}
+/*
+ * mock syslog logging function
+ */
+void
+__wrap_vsyslog(int lvl, const char *fmt, va_list va)
+{
+  struct expect *result;
+  int arg;
+  
+  result = mock_ptr_type(struct expect *);
+
+  if (result->prefix != NULL) {
+    /* check that the prefix is in fmt and advance fmt pointer */
+    if (strncmp(result->prefix, fmt, strlen(result->prefix)) != 0)
+      fail_msg("SYSLOG logger prefix does not match: "\
+	       "expected prefix %s found %s\n", result->prefix, fmt);
+    fmt += strlen(result->prefix);
+  }
+  assert_string_equal(fmt, result->message);
+  arg = va_arg(va, int);
+  assert_int_equal(arg, result->argument);
+}
+#endif
+
+/*
+ * test logging macros that do not specify a logger
+ */
 static void
 test_log(void **state)
 {
-  struct expect_print e;
+  struct expect e;
 
   e.fd = stdout;
   e.message = "debug message %d";
@@ -86,179 +156,296 @@ test_log(void **state)
   log_err("error message %d", 10);
 }
 
-static void
-check_xlog(logger_t hl, struct xlog_state *st)
-{
-  xlog_debug(hl, st->debug.message, st->debug.argument);
-  xlog_info(hl, st->info.message, st->info.argument);
-  xlog_warn(hl, st->warn.message, st->warn.argument);
-  xlog_err(hl, st->err.message, st->err.argument);
-  xlog_msg(hl, st->msg.message, st->msg.argument);
-}
-
-static void
-test_xlog_none(void **state)
-{
-  struct xlog_state *st = *state;
-  
-  log_config(st->logger, LOG_NONE, NULL);
-  check_xlog(st->logger, *state);
-
-  log_config(st->logger, LOG_NONE, st->prefix.message);
-  check_xlog(st->logger, *state);
-}
-
+/*
+ * Test function that performs the test as specified in the state
+ */
 static void
 test_xlog_msg(void **state)
 {
   struct xlog_state *st = *state;
-  
-  log_config(st->logger, LOG_MSG, NULL);
-  will_return(__wrap_vfprintf, &st->msg);
-  check_xlog(st->logger, *state);
-
-  log_config(st->logger, LOG_MSG, st->prefix.message);
-  will_return(__wrap_vfprintf, &st->msg);
-  will_return(__wrap_fprintf, &st->prefix);
-  check_xlog(st->logger, *state);
+  mock_setup(st, LOG_ALERT);
+  st->result.message = "logging %d at level MSG";
+  st->result.argument = 1;
+  xlog_msg(&st->logger, "logging %d at level MSG", 1);
 }
 
 static void
 test_xlog_err(void **state)
 {
-#define MOCK_SET				\
-  will_return(__wrap_vfprintf, &st->err);	\
-  will_return(__wrap_vfprintf, &st->msg)
-  
   struct xlog_state *st = *state;
-  
-  log_config(st->logger, LOG_ERROR, NULL);
-  MOCK_SET;
-  check_xlog(st->logger, *state);
-
-  log_config(st->logger, LOG_ERROR, st->prefix.message);
-  MOCK_SET;
-  will_return(__wrap_fprintf, &st->err_prefix);
-  will_return(__wrap_fprintf, &st->prefix);
-  check_xlog(st->logger, *state);
-
-#undef MOCK_SET
+  mock_setup(st, LOG_ERR);
+  st->result.message = "logging %d at level ERR";
+  st->result.argument = 10;
+  xlog_err(&st->logger, "logging %d at level ERR", 10);
 }
 
 static void
 test_xlog_warn(void **state)
 {
-#define MOCK_SET				\
-  will_return(__wrap_vfprintf, &st->warn);	\
-  will_return(__wrap_vfprintf, &st->err);	\
-  will_return(__wrap_vfprintf, &st->msg)
-  
   struct xlog_state *st = *state;
-  
-  log_config(st->logger, LOG_WARNING, NULL);
-  MOCK_SET;
-  check_xlog(st->logger, *state);
-
-  log_config(st->logger, LOG_WARNING, st->prefix.message);
-  MOCK_SET;
-  will_return(__wrap_fprintf, &st->prefix);
-  will_return(__wrap_fprintf, &st->err_prefix);
-  will_return(__wrap_fprintf, &st->prefix);
-  check_xlog(st->logger, *state);
-
-#undef MOCK_SET
+  mock_setup(st, LOG_WARNING);
+  st->result.message = "logging %d at level WARN";
+  st->result.argument = 100;
+  xlog_warn(&st->logger, "logging %d at level WARN", 100);
 }
 
 static void
 test_xlog_info(void **state)
 {
-#define MOCK_SET				\
-  will_return(__wrap_vfprintf, &st->info);	\
-  will_return(__wrap_vfprintf, &st->warn);	\
-  will_return(__wrap_vfprintf, &st->err);	\
-  will_return(__wrap_vfprintf, &st->msg)
-  
   struct xlog_state *st = *state;
-  
-  log_config(st->logger, LOG_INFO, NULL);
-  MOCK_SET;
-  check_xlog(st->logger, *state);
-
-  log_config(st->logger, LOG_INFO, st->prefix.message);
-  MOCK_SET;
-  will_return_count(__wrap_fprintf, &st->prefix, 2);
-  will_return(__wrap_fprintf, &st->err_prefix);
-  will_return(__wrap_fprintf, &st->prefix);
-  check_xlog(st->logger, *state);
-
-#undef MOCK_SET
+  mock_setup(st, LOG_INFO);
+  st->result.message = "logging %d at level INFO";
+  st->result.argument = 1000;
+  xlog_info(&st->logger, "logging %d at level INFO", 1000);
 }
 
 static void
 test_xlog_debug(void **state)
 {
-#define MOCK_SET				\
-  will_return(__wrap_vfprintf, &st->debug);	\
-  will_return(__wrap_vfprintf, &st->info);	\
-  will_return(__wrap_vfprintf, &st->warn);	\
-  will_return(__wrap_vfprintf, &st->err);	\
-  will_return(__wrap_vfprintf, &st->msg)
-  
   struct xlog_state *st = *state;
-  
-  log_config(st->logger, LOG_DEBUG, NULL);
-  MOCK_SET;
-  check_xlog(st->logger, *state);
-
-  log_config(st->logger, LOG_DEBUG, st->prefix.message);
-  MOCK_SET;
-  will_return_count(__wrap_fprintf, &st->prefix, 3);
-  will_return(__wrap_fprintf, &st->err_prefix);
-  will_return(__wrap_fprintf, &st->prefix);
-  check_xlog(st->logger, *state);
-
-#undef MOCK_SET
+  mock_setup(st, LOG_DEBUG);
+  st->result.message = "logging %d at level DEBUG";
+  st->result.argument = 10000;
+  xlog_debug(&st->logger, "logging %d at level DEBUG", 10000);
 }
 
+
+/*
+ * Test setup functions.
+ *
+ * Each test setup initialises the logger and the expected result 
+ * for a different combination of the logging backend and logger
+ * prefix
+ */
+
+/**
+ * Setup the expected mock calls
+ * this must be called from the actual test function as
+ * doing this in the setup functions seems to fail.
+ */
+static void mock_setup(struct xlog_state *st, int lvl)
+{
+  if (st->logger.level >= lvl) {
+    if (st->logger.backend == LOG_BACKEND_FILE)
+      will_return(__wrap_fopen, &st->result);
+    if (st->logger.backend == LOG_BACKEND_SYSLOG) {
+      will_return(__wrap_openlog, &st->result);
+      will_return(__wrap_vsyslog, &st->result);
+    }
+    else {
+      will_return(__wrap_vfprintf, &st->result);
+      if (st->logger.prefix != NULL)
+	will_return(__wrap_fprintf, &st->result);
+    }
+  }
+}
+
+/**
+ * Setup for tests
+ * Backend: STDIO
+ * Prefix: NULL
+ * Output: stdout
+ */
 static int
-xlog_setup(void **state)
+xlog_setup_stdio(void **state)
+{
+  struct xlog_state *st = *state;
+  printf("Backend: STDIO\n");
+  st->logger.backend = LOG_BACKEND_STDIO;
+  st->logger.prefix = NULL;
+  st->result.fd = stdout;
+  return 0;
+}
+
+/**
+ * Setup for tests
+ * Backend: STDIO
+ * Prefix: NULL
+ * Output: stderr
+ */
+static int
+xlog_setup_stdio_err(void **state)
+{
+  struct xlog_state *st = *state;
+  xlog_setup_stdio(state);
+  st->result.fd = stderr;
+  return 0;
+}
+
+/**
+ * Setup for tests 
+ * Backend: STDIO
+ * Prefix: "stdio backend prefix"
+ * Output: stdout
+ */
+static int
+xlog_setup_stdio_prefix(void **state)
+{
+  struct xlog_state *st = *state;
+  xlog_setup_stdio(state);
+  st->logger.prefix = "stdio prefix";
+  st->result.prefix = "stdio prefix";
+  return 0;
+}
+
+/**
+ * Setup for tests 
+ * Backend: STDIO
+ * Prefix: "stdio backend prefix"
+ * Output: stderr
+ */
+static int
+xlog_setup_stdio_prefix_err(void **state)
+{
+  struct xlog_state *st = *state;
+  xlog_setup_stdio_prefix(state);
+  st->result.fd = stderr;
+  return 0;
+}
+
+/**
+ * Setup file backend
+ * Backend: FILE
+ * Prefix: NULL
+ * Output: mock_fd
+ */
+static int
+xlog_setup_file(void **state)
+{
+  struct xlog_state *st = *state;
+  printf("Backend: FILE\n");
+  st->logger.backend = LOG_BACKEND_FILE;
+  st->logger.private.log_fd = NULL;
+  st->logger.prefix = NULL;
+  st->logger.log_file_path = "path/to/log/file.txt";
+  st->result.log_file_path = "path/to/log/file.txt";
+  st->result.fd = mock_fd;
+  st->result.log_file_mode = "w";
+  return 0;
+}
+
+/**
+ * Setup file backend
+ * Backend: FILE
+ * Prefix: "file backend prefix"
+ * Output: mock_fd
+ */
+static int
+xlog_setup_file_prefix(void **state)
+{
+  struct xlog_state *st = *state;
+  xlog_setup_file(state);
+  st->logger.prefix = "file backend prefix";
+  st->result.prefix = "file backend prefix";
+  return 0;
+}
+
+/**
+ * Setup file backend
+ * Backend: SYSLOG
+ * Prefix: NULL
+ */
+static int
+xlog_setup_syslog(void **state)
+{
+  struct xlog_state *st = *state;
+  printf("Backend: SYSLOG\n");
+  st->logger.backend = LOG_BACKEND_SYSLOG;
+  st->logger.private.syslog_open = false;
+  st->logger.prefix = NULL;
+  st->logger.log_file_path = NULL;
+  st->result.log_file_path = NULL;
+  st->result.fd = mock_fd;
+  st->result.log_file_mode = NULL;
+  st->result.prefix = NULL;
+  return 0;
+}
+
+/**
+ * Setup file backend
+ * Backend: SYSLOG
+ * Prefix: "syslog backend prefix"
+ */
+static int
+xlog_setup_syslog_prefix(void **state)
+{
+  struct xlog_state *st = *state;
+  xlog_setup_syslog(state);
+  st->logger.prefix = "syslog backend prefix";
+  st->result.prefix = "syslog backend prefix";
+  return 0;
+}
+
+/*
+ * Test group setup functions.
+ *
+ * Each group initialises the logger and the expected result 
+ * with a different log level
+ */
+
+static int
+xlog_setup_group_none(void **state)
 {
   struct xlog_state *st = malloc(sizeof(struct xlog_state));
   assert(st != NULL);
-
-  logger_t logger;
-  logger_init(logger); /* init logger */
-  st->logger = logger;
-  st->debug.fd = stdout;
-  st->debug.message = "debug message %d";
-  st->debug.argument = 10;
-  st->info.fd = stdout;
-  st->info.message = "info message %d";
-  st->info.argument = 10;
-  st->warn.fd = stdout;
-  st->warn.message = "warning message %d";
-  st->warn.argument = 10;
-  st->err.fd = stderr;
-  st->err.message = "error message %d";
-  st->err.argument = 10;
-  st->msg.fd = stdout;
-  st->msg.message = "user message %d";
-  st->msg.argument = 10;
-  st->prefix.fd = stdout;
-  st->prefix.message = "log_prefix";
-  /* st->prefix.argument is unused */
-  st->err_prefix.fd = stderr;
-  st->err_prefix.message = "log_prefix";
-  /* st->prefix.argument is unused */
+  st->logger.level = LOG_NONE;
   *state = st;
   return 0;
 }
 
 static int
-xlog_teardown(void **state)
+xlog_setup_group_msg(void **state)
 {
-  struct xlog_state *st = *state;
-  logger_free(st->logger);
+  struct xlog_state *st = malloc(sizeof(struct xlog_state));
+  assert(st != NULL);
+  st->logger.level = LOG_ALERT;
+  *state = st;
+  return 0;
+}
+
+static int
+xlog_setup_group_err(void **state)
+{
+  struct xlog_state *st = malloc(sizeof(struct xlog_state));
+  assert(st != NULL);
+  st->logger.level = LOG_ERR;
+  *state = st;
+  return 0;
+}
+
+static int
+xlog_setup_group_warn(void **state)
+{
+  struct xlog_state *st = malloc(sizeof(struct xlog_state));
+  assert(st != NULL);
+  st->logger.level = LOG_WARNING;
+  *state = st;
+  return 0;
+}
+
+static int
+xlog_setup_group_info(void **state)
+{
+  struct xlog_state *st = malloc(sizeof(struct xlog_state));
+  assert(st != NULL);
+  st->logger.level = LOG_INFO;
+  *state = st;
+  return 0;
+}
+
+static int
+xlog_setup_group_debug(void **state)
+{
+  struct xlog_state *st = malloc(sizeof(struct xlog_state));
+  assert(st != NULL);
+  st->logger.level = LOG_DEBUG;
+  *state = st;
+  return 0;
+}
+
+static int
+xlog_teardown_group(void **state)
+{
   free(*state);
   return 0;
 }
@@ -266,26 +453,76 @@ xlog_teardown(void **state)
 int
 main(int argc, char *argv[])
 {
-  const struct CMUnitTest tests[] = {
+  int retval;
+  
+  const struct CMUnitTest test_default[] = {
     cmocka_unit_test(test_log),
-    cmocka_unit_test_setup_teardown(test_xlog_none,
-				    xlog_setup,
-				    xlog_teardown),
-    cmocka_unit_test_setup_teardown(test_xlog_msg,
-				    xlog_setup,
-				    xlog_teardown),
-    cmocka_unit_test_setup_teardown(test_xlog_err,
-				    xlog_setup,
-				    xlog_teardown),
-    cmocka_unit_test_setup_teardown(test_xlog_warn,
-				    xlog_setup,
-				    xlog_teardown),
-    cmocka_unit_test_setup_teardown(test_xlog_info,
-				    xlog_setup,
-				    xlog_teardown),
-    cmocka_unit_test_setup_teardown(test_xlog_debug,
-				    xlog_setup,
-				    xlog_teardown),
   };
-  return cmocka_run_group_tests(tests, NULL, NULL);
+
+  const struct CMUnitTest test_level_group[] = {
+    cmocka_unit_test_setup(test_xlog_msg, xlog_setup_stdio),
+    cmocka_unit_test_setup(test_xlog_err, xlog_setup_stdio_err),
+    cmocka_unit_test_setup(test_xlog_warn, xlog_setup_stdio),
+    cmocka_unit_test_setup(test_xlog_info, xlog_setup_stdio),
+    cmocka_unit_test_setup(test_xlog_debug, xlog_setup_stdio),
+    
+    cmocka_unit_test_setup(test_xlog_msg, xlog_setup_stdio_prefix),
+    cmocka_unit_test_setup(test_xlog_err, xlog_setup_stdio_prefix_err),
+    cmocka_unit_test_setup(test_xlog_warn, xlog_setup_stdio_prefix),
+    cmocka_unit_test_setup(test_xlog_info, xlog_setup_stdio_prefix),
+    cmocka_unit_test_setup(test_xlog_debug, xlog_setup_stdio_prefix),
+
+    cmocka_unit_test_setup(test_xlog_msg, xlog_setup_file),
+    cmocka_unit_test_setup(test_xlog_err, xlog_setup_file),
+    cmocka_unit_test_setup(test_xlog_warn, xlog_setup_file),
+    cmocka_unit_test_setup(test_xlog_info, xlog_setup_file),
+    cmocka_unit_test_setup(test_xlog_debug, xlog_setup_file),
+    
+    cmocka_unit_test_setup(test_xlog_msg, xlog_setup_file_prefix),
+    cmocka_unit_test_setup(test_xlog_err, xlog_setup_file_prefix),
+    cmocka_unit_test_setup(test_xlog_warn, xlog_setup_file_prefix),
+    cmocka_unit_test_setup(test_xlog_info, xlog_setup_file_prefix),
+    cmocka_unit_test_setup(test_xlog_debug, xlog_setup_file_prefix),
+
+    cmocka_unit_test_setup(test_xlog_msg, xlog_setup_syslog),
+    cmocka_unit_test_setup(test_xlog_err, xlog_setup_syslog),
+    cmocka_unit_test_setup(test_xlog_warn, xlog_setup_syslog),
+    cmocka_unit_test_setup(test_xlog_info, xlog_setup_syslog),
+    cmocka_unit_test_setup(test_xlog_debug, xlog_setup_syslog),
+    
+    cmocka_unit_test_setup(test_xlog_msg, xlog_setup_syslog_prefix),
+    cmocka_unit_test_setup(test_xlog_err, xlog_setup_syslog_prefix),
+    cmocka_unit_test_setup(test_xlog_warn, xlog_setup_syslog_prefix),
+    cmocka_unit_test_setup(test_xlog_info, xlog_setup_syslog_prefix),
+    cmocka_unit_test_setup(test_xlog_debug, xlog_setup_syslog_prefix),
+  };
+
+  retval = cmocka_run_group_tests_name("default logger",
+				       test_default,
+				       NULL, NULL);
+  retval += cmocka_run_group_tests_name("logger lvl NONE",
+					test_level_group,
+					xlog_setup_group_none,
+					xlog_teardown_group);
+  retval += cmocka_run_group_tests_name("logger lvl MSG",
+					test_level_group,
+					xlog_setup_group_msg,
+					xlog_teardown_group);
+  retval += cmocka_run_group_tests_name("logger lvl ERR",
+					test_level_group,
+					xlog_setup_group_err,
+					xlog_teardown_group);
+  retval += cmocka_run_group_tests_name("logger lvl WARNING",
+					test_level_group,
+					xlog_setup_group_warn,
+					xlog_teardown_group);
+  retval += cmocka_run_group_tests_name("logger lvl INFO",
+					test_level_group,
+					xlog_setup_group_info,
+					xlog_teardown_group);
+  retval += cmocka_run_group_tests_name("logger lvl DEBUG",
+					test_level_group,
+					xlog_setup_group_debug,
+					xlog_teardown_group);
+  return retval;
 }

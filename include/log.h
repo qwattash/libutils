@@ -2,73 +2,96 @@
 #define LOG_H
 
 #include <stdlib.h>
+#include <stdio.h>
+#include <stdbool.h>
+
+#ifdef LINUX
+/* Include the definition of log levels */
+#include <syslog.h>
+
+#define LOG_NONE -999
+#else /* LINUX */
+/**
+ * Log levels
+ */
+#define  LOG_DEBUG 5
+#define  LOG_INFO 4
+#define  LOG_WARNING 3
+#define  LOG_ERR 2
+#define  LOG_ALERT 1
+#define  LOG_NONE 0
+#endif /* LINUX */
 
 /**
- * Log level
+ * Logging backend
+ *
+ * LOG_STDIO: log to stdout and stderr
+ * LOG_FILE: log to file
+ * LOG_SYSLOG: log using linux syslog
  */
-enum log_level {
-  LOG_DEBUG = 0,
-  LOG_INFO = 1,
-  LOG_WARNING = 2,
-  LOG_ERROR = 3,
-  LOG_MSG = 4,
-  LOG_NONE = 5,
+enum log_backend {
+  LOG_BACKEND_STDIO,
+  LOG_BACKEND_FILE,
+  LOG_BACKEND_SYSLOG,
 };
 
 /**
- * Internal logger handle representation.
- * This is useful for static initialization of the logger.
+ * Logger handle
  */
 struct logger_handle {
-  enum log_level level;
+  int level;
+  enum log_backend backend;
   const char *prefix;
+  const char *log_file_path;
+  union {
+    // private fields
+    FILE *log_fd;
+    bool syslog_open;
+  } private;
 };
 
-/**
- * Shorthand logger handle type
- */
-typedef struct logger_handle * logger_t;
 
 /* private logging functions - use macros */
-void _log_config(logger_t logger, enum log_level lvl, const char *prefix);
-void _log_stdout(logger_t logger, enum log_level lvl,
-		 const char *fmt, ...);
-void _log_stderr(logger_t logger, enum log_level lvl,
-		 const char *fmt, ...);
-logger_t _logger_init(void);
+void _log(struct logger_handle *logger, int lvl,
+	  const char *fmt, ...);
 
 #ifdef ENABLE_LOGGING
+
+/* macro to create instance of logger handle */
+#define LOG_HANDLE(name, level, prefix)		\
+  struct logger_handle name = {			\
+    .level = level,				\
+    .backend = LOG_BACKEND_STDIO,		\
+    .prefix = prefix,				\
+    .log_file_path = NULL,			\
+    .private.log_fd = NULL,			\
+  }
 
 #ifdef LOG_NODEBUG
 #define log_debug(fmt, ...)
 #define xlog_debug(logger, fmt, ...)
 #else /* ! LOG_NODEBUG */
-#define log_debug(fmt, ...) _log_stdout(NULL, LOG_DEBUG, fmt, ##__VA_ARGS__)
-#define xlog_debug(logger, fmt, ...)			\
-  _log_stdout(logger, LOG_DEBUG, fmt, ##__VA_ARGS__)
+#define log_debug(fmt, ...) _log(NULL, LOG_DEBUG, fmt, ##__VA_ARGS__)
+#define xlog_debug(logger, fmt, ...) _log(logger, LOG_DEBUG, fmt, ##__VA_ARGS__)
 #endif /* ! LOG_NODEBUG */
 
-#define log_info(fmt, ...) _log_stdout(NULL, LOG_INFO, fmt, ##__VA_ARGS__)
-#define log_warn(fmt, ...) _log_stdout(NULL, LOG_WARNING, fmt, ##__VA_ARGS__)
-#define log_err(fmt, ...) _log_stderr(NULL, LOG_ERROR, fmt, ##__VA_ARGS__)
-#define log_msg(fmt, ...) _log_stdout(NULL, LOG_MSG, fmt, ##__VA_ARGS__)
+#define log_info(fmt, ...) _log(NULL, LOG_INFO, fmt, ##__VA_ARGS__)
+#define log_warn(fmt, ...) _log(NULL, LOG_WARNING, fmt, ##__VA_ARGS__)
+#define log_err(fmt, ...) _log(NULL, LOG_ERR, fmt, ##__VA_ARGS__)
+#define log_msg(fmt, ...) _log(NULL, LOG_ALERT, fmt, ##__VA_ARGS__)
 
 #define xlog_info(logger, fmt, ...)			\
-  _log_stdout(logger, LOG_INFO, fmt, ##__VA_ARGS__)
+  _log(logger, LOG_INFO, fmt, ##__VA_ARGS__)
 #define xlog_warn(logger, fmt, ...)			\
-  _log_stdout(logger, LOG_WARNING, fmt, ##__VA_ARGS__)
+  _log(logger, LOG_WARNING, fmt, ##__VA_ARGS__)
 #define xlog_err(logger, fmt, ...)			\
-  _log_stderr(logger, LOG_ERROR, fmt, ##__VA_ARGS__)
+  _log(logger, LOG_ERR, fmt, ##__VA_ARGS__)
 #define xlog_msg(logger, fmt, ...)			\
-  _log_stdout(logger, LOG_MSG, fmt, ##__VA_ARGS__)
-
-#define log_config(logger, lvl, prefix) _log_config(logger, lvl, prefix)
-
-/* avoid warning for unused variables when disabling logging */
-#define logger_init(name) name = _logger_init()
-#define logger_free(name) free(name)
+  _log(logger, LOG_ALERT, fmt, ##__VA_ARGS__)
 
 #else /* ! ENABLE_LOGGING */
+
+#define LOG_HANDLE(name, level, prefix)
 
 #define log_debug(fmt, ...)
 #define log_info(fmt, ...)
@@ -81,12 +104,6 @@ logger_t _logger_init(void);
 #define xlog_warn(logger, fmt, ...)
 #define xlog_err(logger, fmt, ...)
 #define xlog_msg(logger, fmt, ...)
-
-#define log_config(logger, lvl, prefix)
-
-/* avoid warning for unused variables when disabling logging */
-#define logger_init(name)
-#define logger_free(name)
 
 #endif /* ! ENABLE_LOGGING*/
 

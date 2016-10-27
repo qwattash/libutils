@@ -10,6 +10,6 @@ target_include_directories(log_base PUBLIC
 
 set_target_properties(log_base PROPERTIES
   COMPILE_FLAGS "-Wno-unused-function"
-  LINK_FLAGS "-Wl,--wrap=vfprintf -Wl,--wrap=fprintf")
+  LINK_FLAGS "-Wl,--wrap=vfprintf -Wl,--wrap=fprintf -Wl,--wrap=fopen -Wl,--wrap=openlog -Wl,--wrap=vsyslog")
 
 target_link_libraries(log_base cmocka)

@@ -9,7 +9,7 @@ option(ENABLE_TEST "Enable testing" ON)
 option(ENABLE_LOGGING "Enable logging" ON)
 
 # first update the flags
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror -Wall")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror -Wall -DLINUX")
 if (ENABLE_LOGGING)
   set(CMAKE_C_FLAGS_RELEASE "-DENABLE_LOGGING -DLOG_NODEBUG")
 endif ()
