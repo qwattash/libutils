@@ -86,6 +86,21 @@ __wrap_fopen(const char *path, const char *mode)
   return mock_fd;
 }
 
+
+/*
+ * mock fflush for file logging
+ */
+int
+__wrap_fflush(FILE *fd)
+{
+  struct expect *result;
+
+  result = mock_ptr_type(struct expect *);
+
+  assert_ptr_equal(fd, result->fd);
+  return 0;
+}
+
 #ifdef LINUX
 /*
  * mock syslog open file
@@ -226,8 +241,10 @@ test_xlog_debug(void **state)
 static void mock_setup(struct xlog_state *st, int lvl)
 {
   if (st->logger.level >= lvl) {
-    if (st->logger.backend == LOG_BACKEND_FILE)
+    if (st->logger.backend == LOG_BACKEND_FILE) {
       will_return(__wrap_fopen, &st->result);
+      will_return(__wrap_fflush, &st->result);
+    }
     if (st->logger.backend == LOG_BACKEND_SYSLOG) {
       will_return(__wrap_openlog, &st->result);
       will_return(__wrap_vsyslog, &st->result);

@@ -49,6 +49,7 @@ _log(struct logger_handle *logger, int lvl,
       if (logger->prefix != NULL)
 	fprintf(logger->private.log_fd, logger->prefix);
       vfprintf(logger->private.log_fd, fmt, va);
+      fflush(logger->private.log_fd);
     }
     break;
 #ifdef LINUX
