@@ -60,11 +60,11 @@ void _log(struct logger_handle *logger, int lvl,
 /* macro to create instance of logger handle */
 #define LOG_HANDLE(name, level, prefix)		\
   struct logger_handle name = {			\
-    .level = level,				\
-    .backend = LOG_BACKEND_STDIO,		\
-    .prefix = prefix,				\
-    .log_file_path = NULL,			\
-    .private.log_fd = NULL,			\
+    level,					\
+    LOG_BACKEND_STDIO,				\
+    prefix,					\
+    NULL,					\
+    {.log_fd = NULL},				\
   }
 
 #ifdef LOG_NODEBUG

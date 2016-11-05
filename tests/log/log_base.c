@@ -172,6 +172,48 @@ test_log(void **state)
 }
 
 /*
+ * Test LOG_HANDLE macro for static logger definition 
+ */
+static void
+test_log_handle(void **state)
+{
+  LOG_HANDLE(logger_struct, LOG_DEBUG, "prefix");
+
+  struct logger_handle *logger = &logger_struct;
+  struct expect e;
+
+  e.fd = stdout;
+  e.message = "debug message %d";
+  e.prefix = "prefix";
+  e.argument = 10;
+
+  will_return(__wrap_fprintf, &e);
+  will_return(__wrap_vfprintf, &e);
+  xlog_debug(logger, "debug message %d", 10);
+
+  e.message = "info message %d";
+  will_return(__wrap_fprintf, &e);
+  will_return(__wrap_vfprintf, &e);
+  xlog_info(logger, "info message %d", 10);
+
+  e.message = "warning message %d";
+  will_return(__wrap_fprintf, &e);
+  will_return(__wrap_vfprintf, &e);
+  xlog_warn(logger, "warning message %d", 10);
+
+  e.message = "user message %d";
+  will_return(__wrap_fprintf, &e);
+  will_return(__wrap_vfprintf, &e);
+  xlog_msg(logger, "user message %d", 10);
+
+  e.fd = stderr;
+  e.message = "error message %d";
+  will_return(__wrap_fprintf, &e);
+  will_return(__wrap_vfprintf, &e);
+  xlog_err(logger, "error message %d", 10);
+}
+
+/*
  * Test function that performs the test as specified in the state
  */
 static void
@@ -474,6 +516,7 @@ main(int argc, char *argv[])
   
   const struct CMUnitTest test_default[] = {
     cmocka_unit_test(test_log),
+    cmocka_unit_test(test_log_handle),
   };
 
   const struct CMUnitTest test_level_group[] = {
