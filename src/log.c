@@ -45,11 +45,15 @@ _log(struct logger_handle *logger, int lvl,
 	logger->private.log_fd = fopen(logger->log_file_path, "w");
 	if (logger->private.log_fd == NULL)
 	  break;
+	if (setvbuf(logger->private.log_fd, NULL, _IONBF, BUFSIZ)) {
+	  fclose(logger->private.log_fd);
+	  logger->private.log_fd = NULL;
+	  break;
+	}
       }
       if (logger->prefix != NULL)
 	fprintf(logger->private.log_fd, logger->prefix);
       vfprintf(logger->private.log_fd, fmt, va);
-      fflush(logger->private.log_fd);
     }
     break;
 #ifdef LINUX
