@@ -40,6 +40,20 @@ ap_setup(void **state)
 }
 
 static int
+ap_setup_empty(void **state)
+{
+
+  int err;
+  argparse_t ap;
+
+  err = argparse_init(&ap, "Test parser", NULL);
+  assert_int_equal(err, 0);
+
+  *state = ap;
+  return 0;
+}
+
+static int
 ap_teardown(void **state)
 {
   return argparse_destroy(*state);

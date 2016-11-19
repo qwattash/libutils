@@ -69,6 +69,24 @@ test_ap_parse_empty(void **state)
   assert_int_equal(err, E_PARSE);
 }
 
+static void
+test_ap_parse_empty_string_param(void **state)
+{
+  int argc = 2;
+  char *argv[] = {
+    "./out",
+    "-s",
+    "XXXXXXXXX" // guard this is a constant value that prevents random results
+  };
+  int err;
+
+  err = argparse_arg_add(*state, "string", 's', T_STRING, "", false);
+  assert_int_equal(err, 0);
+
+  err = argparse_parse(*state, argc, argv);
+  assert_int_equal(err, E_PARSE);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -85,6 +103,9 @@ main(int argc, char *argv[])
 				    ap_teardown),
     cmocka_unit_test_setup_teardown(test_ap_parse_empty,
     				    ap_setup,
+				    ap_teardown),
+    cmocka_unit_test_setup_teardown(test_ap_parse_empty_string_param,
+				    ap_setup_empty,
 				    ap_teardown),
   };
   return cmocka_run_group_tests(tests, NULL, NULL);

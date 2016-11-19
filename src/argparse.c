@@ -144,6 +144,8 @@ struct argparse_add_unset_flag_args {
 struct argparse_parser_state {
   /* argument vector to parse */
   char **argv;
+  /* expected number of arguments */
+  int argc;
   /* index of the current argument */
   int index;
   /* stack of subcommands that are taken */
@@ -876,6 +878,11 @@ argparse_parse_posarg(struct argparse_parser_state *st)
   return (error);
 }
 
+/**
+ * Parse a named option argument.
+ * The argument may have a long or short name and may
+ * have a value or be flag.
+ */
 static int
 argparse_parse_arg_named(struct argparse_parser_state *st)
 {
@@ -930,6 +937,11 @@ argparse_parse_arg_named(struct argparse_parser_state *st)
     arg = NULL;
   }
   else {
+    if (st->index >= st->argc) {
+      xlog_err(logger, "Expected value for --%s\n", item->opt->name);
+      argparse_helpmsg(st->root_cmd);
+      goto err_parse;
+    }
     arg = st->argv[st->index++];
   }
 
@@ -1124,6 +1136,7 @@ argparse_parse(argparse_t ap, int argc, char *argv[])
   assert(ap != NULL);
 
   state.argv = argv;
+  state.argc = argc;
   state.index = 1;
   state.root_cmd = ap;
   error = list_init(&state.subcmd_stack, NULL, NULL);
