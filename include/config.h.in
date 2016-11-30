@@ -1,0 +1,5 @@
+/**
+ * cmake generated platform-dependant configuration
+ */
+
+#cmakedefine HAVE_SYSLOG_H 1

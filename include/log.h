@@ -5,7 +5,9 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#ifdef LINUX
+#include "config.h"
+
+#ifdef HAVE_SYSLOG_H
 /* Include the definition of log levels */
 #include <syslog.h>
 
