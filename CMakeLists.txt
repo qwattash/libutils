@@ -11,7 +11,8 @@ option(ENABLE_LOGGING "Enable logging" ON)
 # check for optional required features
 include(CheckIncludeFiles)
 check_include_files(syslog.h HAVE_SYSLOG_H)
-configure_file("include/config.h.in" "${CMAKE_CURRENT_BINARY_DIR}/include/config.h")
+configure_file("include/config.h.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/include/utils_config.h")
 
 # first update the flags
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror -Wall")

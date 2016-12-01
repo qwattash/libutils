@@ -2,6 +2,7 @@
 #include <stdarg.h>
 #include <string.h>
 
+#include "utils_config.h"
 #include "log.h"
 
 
@@ -14,7 +15,7 @@ _log(struct logger_handle *logger, int lvl,
   va_list va;
   enum log_backend backend;
   FILE *fd;
-#ifdef LINUX
+#ifdef HAVE_SYSLOG_H
   char *syslog_msg;
 #endif
 
@@ -56,7 +57,7 @@ _log(struct logger_handle *logger, int lvl,
       vfprintf(logger->private.log_fd, fmt, va);
     }
     break;
-#ifdef LINUX
+#ifdef HAVE_SYSLOG_H
   case LOG_BACKEND_SYSLOG:
     if (logger != NULL) {
       if (logger->private.syslog_open == false) {

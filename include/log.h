@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#include "config.h"
+#include "utils_config.h"
 
 #ifdef HAVE_SYSLOG_H
 /* Include the definition of log levels */
@@ -60,8 +60,7 @@ void _log(struct logger_handle *logger, int lvl,
 #ifdef ENABLE_LOGGING
 
 /* macro to create instance of logger handle */
-#define LOG_HANDLE(name, level, prefix)		\
-  struct logger_handle name = {			\
+#define LOG_HANDLE(level, prefix) {		\
     level,					\
     LOG_BACKEND_STDIO,				\
     prefix,					\
@@ -93,19 +92,19 @@ void _log(struct logger_handle *logger, int lvl,
 
 #else /* ! ENABLE_LOGGING */
 
-#define LOG_HANDLE(name, level, prefix)
+#define LOG_HANDLE(name, level, prefix) 0
 
-#define log_debug(fmt, ...)
-#define log_info(fmt, ...)
-#define log_warn(fmt, ...)
-#define log_err(fmt, ...)
-#define log_msg(fmt, ...)
+#define log_debug(fmt, ...) (void)0
+#define log_info(fmt, ...) (void)0
+#define log_warn(fmt, ...) (void)0
+#define log_err(fmt, ...) (void)0
+#define log_msg(fmt, ...) (void)0
 
-#define xlog_debug(logger, fmt, ...)
-#define xlog_info(logger, fmt, ...)
-#define xlog_warn(logger, fmt, ...)
-#define xlog_err(logger, fmt, ...)
-#define xlog_msg(logger, fmt, ...)
+#define xlog_debug(logger, fmt, ...) (void)0
+#define xlog_info(logger, fmt, ...) (void)0
+#define xlog_warn(logger, fmt, ...) (void)0
+#define xlog_err(logger, fmt, ...) (void)0
+#define xlog_msg(logger, fmt, ...) (void)0
 
 #endif /* ! ENABLE_LOGGING*/
 

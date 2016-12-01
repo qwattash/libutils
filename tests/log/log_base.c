@@ -8,6 +8,7 @@
 
 #include <cmocka.h>
 
+#include "utils_config.h"
 #include "log.h"
 
 struct expect {
@@ -102,7 +103,7 @@ __wrap_setvbuf(FILE *fd, char *buffer, int mode, size_t size)
   return 0;
 }
 
-#ifdef LINUX
+#ifdef HAVE_SYSLOG_H
 /*
  * mock syslog open file
  */
@@ -178,7 +179,7 @@ test_log(void **state)
 static void
 test_log_handle(void **state)
 {
-  LOG_HANDLE(logger_struct, LOG_DEBUG, "prefix");
+  struct logger_handle logger_struct = LOG_HANDLE(LOG_DEBUG, "prefix");
 
   struct logger_handle *logger = &logger_struct;
   struct expect e;
