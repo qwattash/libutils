@@ -17,7 +17,7 @@ static struct logger_handle _logger = {
 #ifdef DEBUG
   .level = LOG_DEBUG,
 #else /* ! DEBUG */
-  .level = LOG_ERROR,
+  .level = LOG_ERR,
 #endif /* ! DEBUG */
   .prefix = "[argparse] ",
 };
