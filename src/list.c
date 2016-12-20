@@ -25,18 +25,30 @@ extern void _test_free(const void *ptr, const char *file, const int line);
 #define ASSERT_HANDLE_VALID_PTR(hnd) if (hnd == NULL) return NULL
 
 /**
- * simple generic list structure
+ * list item internal representation
  */
 struct list_item {
   struct list_item *next;
   void *data;
 };
 
+/**
+ * list internal representation
+ */
 struct list_handle {
   struct list_item *base;
   list_ctor_t ctor;
   list_dtor_t dtor;
   size_t len;
+};
+
+/**
+ * list iterator internal representation
+ */
+struct list_iterator {
+  struct list_handle *list;
+  struct list_item *cursor;
+  bool end;
 };
 
 int
@@ -272,5 +284,102 @@ list_append(list_t handle, void *data)
     previous->next = new;
   new->next = NULL;
   handle->len++;
+  return 0;
+}
+
+int
+list_iter(list_t handle, list_iter_t *iter)
+{
+  struct list_iterator *list_iter;
+
+  ASSERT_HANDLE_VALID(handle);
+  if (iter == NULL)
+    return -1;
+
+  *iter = NULL;
+
+  list_iter = malloc(sizeof(struct list_iterator));
+  if (list_iter == NULL)
+    return -1;
+
+  list_iter->list = handle;
+  list_iter->cursor = handle->base;
+  list_iter->end = false;
+
+  *iter = list_iter;
+  return 0;
+}
+
+int
+list_iter_free(list_iter_t iter)
+{
+  if (iter == NULL)
+    return -1;
+
+  free(iter);
+  return 0;
+}
+
+int
+list_iter_next(list_iter_t iter)
+{
+  struct list_item *item;
+  
+  if (iter == NULL)
+    return -1;
+
+  item = iter->cursor->next;
+  if (item == NULL)
+    iter->end = true;
+  iter->cursor = item;
+  return 0;
+}
+
+int
+list_iter_item(list_iter_t iter, void **item)
+{
+  if (iter == NULL)
+    return -1;
+  if (item == NULL)
+    return -1;
+
+  if (iter->end)
+    return -1;
+  *item = iter->cursor->data;
+  return 0;
+}
+
+bool
+list_iter_end(list_iter_t iter)
+{
+  if (iter == NULL)
+    return -1;
+
+  return iter->end;
+}
+
+int
+list_iter_seek(list_iter_t iter, int index)
+{
+  struct list_item *curr;
+  int position;
+
+  if (iter == NULL)
+    return -1;
+
+  position = 0;
+  curr = iter->list->base;
+
+  while (curr != NULL && position < index) {
+    curr = curr->next;
+    position++;
+  }
+
+  if (curr == NULL)
+    /* Can not seek out of bound index */
+    return -1;
+
+  iter->cursor = curr;
+  iter->end = false;
   return 0;
 }
