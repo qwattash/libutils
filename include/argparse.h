@@ -66,6 +66,13 @@ int argparse_init(argparse_t *ap, const char *help, argconsumer_t cbk,
 int argparse_destroy(argparse_t ap);
 
 /*
+ * Reset the parser state to parse another argument vector
+ * @param[in,out] ap argparse handle
+ * @return ARGPARSE_OK on success, error code on failure
+ */
+int argparse_reset(argparse_t ap);
+
+/*
  * Add argument option to the parser
  * @param[in,out] ap argparse handle
  * @param[in] name long name of the option

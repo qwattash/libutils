@@ -9,14 +9,14 @@ test_list_iter(void **state)
   int rc;
   bool is_end;
 
-  rc = list_iter(*state, &iter);
-  assert_int_equal(rc, 0);
+  iter = list_iter(*state);
+  assert_ptr_not_equal(iter, NULL);
 
   /* element 0 */
   is_end = list_iter_end(iter);
   assert_false(is_end);
-  rc = list_iter_item(iter, (void **)&item_data);
-  assert_int_equal(rc, 0);
+  item_data = list_iter_item(iter);
+  assert_ptr_not_equal(item_data, NULL);
   assert_string_equal(item_data, "0");
 
   rc = list_iter_next(iter);
@@ -25,8 +25,8 @@ test_list_iter(void **state)
   /* element 1 */
   is_end = list_iter_end(iter);
   assert_false(is_end);
-  rc = list_iter_item(iter, (void **)&item_data);
-  assert_int_equal(rc, 0);
+  item_data = list_iter_item(iter);
+  assert_ptr_not_equal(item_data, NULL);
   assert_string_equal(item_data, "1");
 
   rc = list_iter_next(iter);
@@ -35,8 +35,8 @@ test_list_iter(void **state)
   /* element 2 */
   is_end = list_iter_end(iter);
   assert_false(is_end);
-  rc = list_iter_item(iter, (void **)&item_data);
-  assert_int_equal(rc, 0);
+  item_data = list_iter_item(iter);
+  assert_ptr_not_equal(item_data, NULL);
   assert_string_equal(item_data, "2");
 
   rc = list_iter_next(iter);
@@ -45,8 +45,8 @@ test_list_iter(void **state)
   /* element 3 */
   is_end = list_iter_end(iter);
   assert_false(is_end);
-  rc = list_iter_item(iter, (void **)&item_data);
-  assert_int_equal(rc, 0);
+  item_data = list_iter_item(iter);
+  assert_ptr_not_equal(item_data, NULL);
   assert_string_equal(item_data, "3");
 
   rc = list_iter_next(iter);
@@ -55,8 +55,8 @@ test_list_iter(void **state)
   /* iter end */
   is_end = list_iter_end(iter);
   assert_true(is_end);
-  rc = list_iter_item(iter, (void **)&item_data);
-  assert_int_equal(rc, -1);
+  item_data = list_iter_item(iter);
+  assert_null(item_data);
   
   /* free */
   rc = list_iter_free(iter);

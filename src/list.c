@@ -287,27 +287,22 @@ list_append(list_t handle, void *data)
   return 0;
 }
 
-int
-list_iter(list_t handle, list_iter_t *iter)
+list_iter_t
+list_iter(list_t handle)
 {
   struct list_iterator *list_iter;
 
-  ASSERT_HANDLE_VALID(handle);
-  if (iter == NULL)
-    return -1;
-
-  *iter = NULL;
+  ASSERT_HANDLE_VALID_PTR(handle);
 
   list_iter = malloc(sizeof(struct list_iterator));
   if (list_iter == NULL)
-    return -1;
+    return NULL;
 
   list_iter->list = handle;
   list_iter->cursor = handle->base;
   list_iter->end = false;
 
-  *iter = list_iter;
-  return 0;
+  return list_iter;
 }
 
 int
@@ -335,18 +330,15 @@ list_iter_next(list_iter_t iter)
   return 0;
 }
 
-int
-list_iter_item(list_iter_t iter, void **item)
+void *
+list_iter_item(list_iter_t iter)
 {
   if (iter == NULL)
-    return -1;
-  if (item == NULL)
-    return -1;
+    return NULL;
 
   if (iter->end)
-    return -1;
-  *item = iter->cursor->data;
-  return 0;
+    return NULL;
+  return (void *)iter->cursor->data;
 }
 
 bool

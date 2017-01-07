@@ -647,6 +647,59 @@ argparse_destroy(argparse_t ap)
 }
 
 /*
+ * Reset parser state
+ */
+int
+argparse_reset(argparse_t ap)
+{
+  int rc;
+  list_iter_t subcommands;
+  struct argparse_handle *sub;
+
+  assert(ap != NULL);
+  xlog_debug(logger, "Reset parser %s\n", ap->subcommand_name);
+  while (list_length(ap->args) > 0) {
+    rc = list_delete(ap->args, 0);
+    if (rc != ARGPARSE_OK) {
+      xlog_err(logger, "Can not reset parsed arg %d\n",
+	       list_length(ap->args));
+      return ARGPARSE_ERROR;
+    }
+  }
+  while (list_length(ap->pos_args) > 0) {
+    rc = list_delete(ap->pos_args, 0);
+    if (rc != ARGPARSE_OK) {
+      xlog_err(logger, "Can not reset parsed posarg%d\n",
+	       list_length(ap->pos_args));
+      return ARGPARSE_ERROR;
+    }
+  }
+  ap->curr_posarg = 0;
+
+  subcommands = list_iter(ap->subcommands);
+  if (subcommands == NULL) {
+    xlog_err(logger, "Can not create subcommands iterator for %s\n",
+	     ap->subcommand_name);
+    return ARGPARSE_ERROR;
+  }
+  while (! list_iter_end(subcommands)) {
+    sub = list_iter_item(subcommands);
+    if (sub == NULL) {
+      xlog_err(logger, "Invalid subcommand\n");
+      return ARGPARSE_ERROR;
+    }
+    rc = argparse_reset(sub);
+    if (rc == ARGPARSE_ERROR) {
+      list_iter_free(subcommands);
+      return rc;
+    }
+    list_iter_next(subcommands);
+  }
+  list_iter_free(subcommands);
+  return ARGPARSE_OK;
+}
+
+/*
  * Create new subcommand
  */
 argparse_t

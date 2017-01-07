@@ -122,11 +122,9 @@ int list_append(list_t handle, void *data);
 /**
  * Get an iterator for the list
  * @param[in] handle: pointer to a list handle
- * @param[out] iter: pointer to an iterator handle, the
- * iterator must be deallocated.
- * @return: zero on success, negative error value
+ * @return: list iterator handle or NULL
  */
-int list_iter(list_t handle, list_iter_t *iter);
+list_iter_t list_iter(list_t handle);
 
 /**
  * Free an iterator
@@ -149,11 +147,9 @@ int list_iter_next(list_iter_t iter);
  * pointer to the whole list_handle instead of a pointer to
  * the head element.
  * @param[in,out] iter: iterator handle
- * @param[out] item: pointer to a location where to store the list item
- * @return: zero on success, negative error value. When the list reaches
- * the end error is also returned.
+ * @return: item pointer or NULL
  */
-int list_iter_item(list_iter_t iter, void **item);
+void *list_iter_item(list_iter_t iter);
 
 /**
  * Check if the iterator has reached the end
