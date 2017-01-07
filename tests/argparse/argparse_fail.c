@@ -18,7 +18,7 @@ test_ap_parse_fail_required(void **state)
   assert_int_equal(err, 0);
 
   err = argparse_parse(*state, argc, argv);
-  assert_int_equal(err, E_PARSE);
+  assert_int_equal(err, ARGPARSE_ERROR);
 }
 
 static void
@@ -36,7 +36,7 @@ test_ap_parse_fail_extra_posarg(void **state)
   int err;
 
   err = argparse_parse(*state, argc, argv);
-  assert_int_equal(err, E_PARSE);
+  assert_int_equal(err, ARGPARSE_ERROR);
 }
 
 static void
@@ -53,7 +53,7 @@ test_ap_parse_fail_posarg_type(void **state)
   int err;
   
   err = argparse_parse(*state, argc, argv);
-  assert_int_equal(err, E_PARSE);
+  assert_int_equal(err, ARGPARSE_ERROR);
 }
 
 static void
@@ -66,7 +66,7 @@ test_ap_parse_empty(void **state)
   int err;
 
   err = argparse_parse(*state, argc, argv);
-  assert_int_equal(err, E_PARSE);
+  assert_int_equal(err, ARGPARSE_ERROR);
 }
 
 static void
@@ -84,7 +84,7 @@ test_ap_parse_empty_string_param(void **state)
   assert_int_equal(err, 0);
 
   err = argparse_parse(*state, argc, argv);
-  assert_int_equal(err, E_PARSE);
+  assert_int_equal(err, ARGPARSE_ERROR);
 }
 
 int

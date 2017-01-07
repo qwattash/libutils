@@ -34,17 +34,14 @@ enum argparse_argtype {
 
 typedef struct argparse_handle * argparse_t;
 typedef enum argparse_argtype argtype_t;
-typedef int (*argconsumer_t)(const argparse_t);
+typedef int (*argconsumer_t)(const argparse_t, void *);
 
 /*
  * Error codes
- * XXX consider using an error.h
  */
-#define E_PARSE 1 /* generic parsing error */
-#define E_SETUP 2 /* parser setup error */
-#define E_NOARG 3 /* argument not specified */
-#define E_ALLOC 4 /* allocation of memory failed */
-#define E_REQUIRED 5 /* missing required argument */
+#define ARGPARSE_OK 0
+#define ARGPARSE_ERROR 1
+#define ARGPARSE_NOARG 2
 
 /* maximum string argument length */
 #define ARGPARSE_STR_MAX 64
@@ -54,10 +51,12 @@ typedef int (*argconsumer_t)(const argparse_t);
  * @param[in,out] ap pointer to an argparse handle
  * @param[in] help help string for the top-level parser
  * @param[in] cbk callback invoked when top-level options
+ * @param[in] userdata user-defined data passed to the callback
  * have been parsed.
  * @return zero on success, error code on failure
  */
-int argparse_init(argparse_t *ap, const char *help, argconsumer_t cbk);
+int argparse_init(argparse_t *ap, const char *help, argconsumer_t cbk,
+		  void *userdata);
 
 /*
  * Deallocate a parser
@@ -125,12 +124,14 @@ void argparse_helpmsg(argparse_t ap);
  * @param[in] name the subcommand name
  * @param[in] cbk callback invoked when options to the
  * subcommand have been parsed;
+ * @param[in] userdata user-defined data passed to the callback
  * @return subcommand handle
  *
  * The callback is designed to simplify the machinery for
  * picking the parsed arguments from subcommands.
  */
 argparse_t argparse_subcmd_add(argparse_t ap, const char *name,
-			       const char *help, argconsumer_t cbk);
+			       const char *help, argconsumer_t cbk,
+			       void *userdata);
 
 #endif

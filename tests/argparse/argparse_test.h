@@ -21,7 +21,7 @@ ap_setup(void **state)
   int err;
   argparse_t ap;
 
-  err = argparse_init(&ap, "Test parser", NULL);
+  err = argparse_init(&ap, "Test parser", NULL, NULL);
   assert_int_equal(err, 0);
   err = argparse_arg_add(ap, "arg1", 'a', T_STRING, "", false);
   assert_int_equal(err, 0);
@@ -46,7 +46,7 @@ ap_setup_empty(void **state)
   int err;
   argparse_t ap;
 
-  err = argparse_init(&ap, "Test parser", NULL);
+  err = argparse_init(&ap, "Test parser", NULL, NULL);
   assert_int_equal(err, 0);
 
   *state = ap;

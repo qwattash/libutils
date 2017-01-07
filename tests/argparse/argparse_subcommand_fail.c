@@ -4,7 +4,7 @@
 static int subcommand_options_cbk_count = 0;
 
 static int
-subcommand_options_cbk(argparse_t ap)
+subcommand_options_cbk(argparse_t ap, void *args)
 {
   subcommand_options_cbk_count++;
   return 0;
@@ -30,7 +30,7 @@ test_ap_parse_fail_required(void **state)
   int err;
 
   sub = argparse_subcmd_add(*state, "my_subcmd", "help msg",
-			    subcommand_options_cbk);
+			    subcommand_options_cbk, NULL);
   assert_non_null(sub);
   err = argparse_arg_add(*state, "req", 'r', T_STRING, "", true);
   assert_int_equal(err, 0);
@@ -44,7 +44,7 @@ test_ap_parse_fail_required(void **state)
   assert_int_equal(err, 0);
 
   err = argparse_parse(*state, argc, argv);
-  assert_int_equal(err, E_PARSE);
+  assert_int_equal(err, ARGPARSE_ERROR);
 
   /* check that it has NOT been called */
   assert_int_equal(subcommand_options_cbk_count, 0);
@@ -76,7 +76,7 @@ test_ap_parse_fail_extra_posarg(void **state)
   int err;
 
   sub = argparse_subcmd_add(*state, "my_subcmd", "help msg",
-			    subcommand_options_cbk);
+			    subcommand_options_cbk, NULL);
   assert_non_null(sub);
 
   err = argparse_arg_add(sub, "arg2", 'b', T_INT, "", false);
@@ -86,7 +86,7 @@ test_ap_parse_fail_extra_posarg(void **state)
   assert_int_equal(err, 0);
 
   err = argparse_parse(*state, argc, argv);
-  assert_int_equal(err, E_PARSE);
+  assert_int_equal(err, ARGPARSE_ERROR);
 
   /* check that it has been called since the extra posarg is
    * detected only at the end
@@ -116,7 +116,7 @@ test_ap_parse_fail_posarg_type(void **state)
   int err;
 
   sub = argparse_subcmd_add(*state, "my_subcmd", "help msg",
-			    subcommand_options_cbk);
+			    subcommand_options_cbk, NULL);
   assert_non_null(sub);
 
   err = argparse_arg_add(sub, "arg2", 'b', T_INT, "", false);
@@ -128,7 +128,7 @@ test_ap_parse_fail_posarg_type(void **state)
   assert_int_equal(err, 0);
 
   err = argparse_parse(*state, argc, argv);
-  assert_int_equal(err, E_PARSE);
+  assert_int_equal(err, ARGPARSE_ERROR);
 
   /* check that it has not been called */
   assert_int_equal(subcommand_options_cbk_count, 0);
@@ -147,7 +147,7 @@ test_ap_parse_empty(void **state)
   int err;
 
   sub = argparse_subcmd_add(*state, "my_subcmd", "help msg",
-			    subcommand_options_cbk);
+			    subcommand_options_cbk, NULL);
   assert_non_null(sub);
 
   err = argparse_arg_add(sub, "arg2", 'b', T_INT, "", false);
@@ -157,7 +157,7 @@ test_ap_parse_empty(void **state)
   assert_int_equal(err, 0);
 
   err = argparse_parse(*state, argc, argv);
-  assert_int_equal(err, E_PARSE);
+  assert_int_equal(err, ARGPARSE_ERROR);
 
   /* check that it has not been called */
   assert_int_equal(subcommand_options_cbk_count, 0);

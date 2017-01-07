@@ -22,7 +22,7 @@ test_ap_posarg_ordering(void **state)
   int intarg, err;
 
   char *argv[] = {"./a.out", "0", "1", "2"};
-  err = argparse_init(&ap, "Test parser", NULL);
+  err = argparse_init(&ap, "Test parser", NULL, NULL);
   assert_int_equal(err, 0);
 
   err = argparse_posarg_add(ap, "pos0", T_INT, "");
@@ -107,7 +107,7 @@ test_ap_parse_success_required(void **state)
   err = argparse_parse(*state, argc, argv);
   assert_int_equal(err, 0);
   err = argparse_arg_get(*state, "arg1", strarg, 64);
-  assert_int_equal(err, E_NOARG);
+  assert_int_equal(err, ARGPARSE_NOARG);
   assert_string_equal(strarg, "");
   
   err = argparse_arg_get(*state, "arg3", &flag, 0);
@@ -115,7 +115,7 @@ test_ap_parse_success_required(void **state)
   assert_int_equal(flag, false);
   
   err = argparse_arg_get(*state, "arg2", &intarg, 0);
-  assert_int_equal(err, E_NOARG);
+  assert_int_equal(err, ARGPARSE_NOARG);
   assert_int_equal(intarg, 10);
   
   err = argparse_arg_get(*state, "req", strarg, 64);

@@ -7,7 +7,7 @@ test_ap_init_destroy(void **state)
   int err;
   argparse_t ap;
 
-  err = argparse_init(&ap, "Test parser", NULL);
+  err = argparse_init(&ap, "Test parser", NULL, NULL);
   assert_int_equal(err, 0);
   err = argparse_destroy(ap);
   assert_int_equal(err, 0);
@@ -19,7 +19,7 @@ test_ap_full_destroy(void **state)
   int err;
   argparse_t ap;
 
-  err = argparse_init(&ap, "Test parser", NULL);
+  err = argparse_init(&ap, "Test parser", NULL, NULL);
   assert_int_equal(err, 0);
   err = argparse_arg_add(ap, "a", 'a', T_STRING, "help a", false);
   assert_int_equal(err, 0);

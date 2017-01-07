@@ -9,7 +9,7 @@ test_subcommand_init(void **state)
 {
   argparse_t sub;
 
-  sub = argparse_subcmd_add(*state, "mycmd", "do something", NULL);
+  sub = argparse_subcmd_add(*state, "mycmd", "do something", NULL, NULL);
   assert_non_null(sub);
 }
 
@@ -21,13 +21,13 @@ test_subcommand_nesting(void **state)
 {
   argparse_t sub1, sub2, sub3, sub4;
 
-  sub1 = argparse_subcmd_add(*state, "sub1", "top->sub1", NULL);
+  sub1 = argparse_subcmd_add(*state, "sub1", "top->sub1", NULL, NULL);
   assert_non_null(sub1);
-  sub2 = argparse_subcmd_add(sub1, "sub2", "top->sub1->sub2", NULL);
+  sub2 = argparse_subcmd_add(sub1, "sub2", "top->sub1->sub2", NULL, NULL);
   assert_non_null(sub2);
-  sub3 = argparse_subcmd_add(sub1, "sub3", "top->sub1->sub3", NULL);
+  sub3 = argparse_subcmd_add(sub1, "sub3", "top->sub1->sub3", NULL, NULL);
   assert_non_null(sub3);
-  sub4 = argparse_subcmd_add(sub2, "sub4", "top->sub1->sub2->sub4", NULL);
+  sub4 = argparse_subcmd_add(sub2, "sub4", "top->sub1->sub2->sub4", NULL, NULL);
   assert_non_null(sub4);
 }
 
@@ -40,7 +40,7 @@ test_subcommand_options(void **state)
   int err;
   argparse_t sub, nested;
   
-  sub = argparse_subcmd_add(*state, "my_subcmd", "help msg", NULL);
+  sub = argparse_subcmd_add(*state, "my_subcmd", "help msg", NULL, NULL);
   assert_non_null(sub);
   /* 
    * argument names voluntarily clash with the arguments names in the
@@ -58,7 +58,7 @@ test_subcommand_options(void **state)
   err = argparse_posarg_add(sub, "pos2", T_INT, "");
   assert_int_equal(err, 0);
   
-  nested = argparse_subcmd_add(sub, "my_nested", "help msg", NULL);
+  nested = argparse_subcmd_add(sub, "my_nested", "help msg", NULL, NULL);
   assert_non_null(nested);
 
   err = argparse_arg_add(nested, "arg1", 'a', T_STRING, "", false);

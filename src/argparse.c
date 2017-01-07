@@ -64,6 +64,7 @@ struct argparse_handle {
   int curr_posarg; /* last positional argument found */
   char *bin_name; /* name of the executable extracted from argv[0] */
   argconsumer_t cbk; /* post-parsing callback */
+  void *userdata; /* user-defined callback arguments */
 };
 
 /*
@@ -224,7 +225,7 @@ argparse_subcommand_ctor(void **itmdata, void *data)
   sub->curr_posarg = 0;
   sub->bin_name = NULL;
   *itmdata = sub;
-  return 0;
+  return ARGPARSE_OK;
   
  err_posopts:
   list_destroy(sub->options);
@@ -235,7 +236,7 @@ argparse_subcommand_ctor(void **itmdata, void *data)
  err_args:
   list_destroy(sub->subcommands);
  err_sub:
-  return E_SETUP;
+  return ARGPARSE_ERROR;
 }
 
 /**
@@ -261,9 +262,9 @@ argparse_subcommand_dtor(void *data)
    * do not deallocate.
    */
   if (error)
-    return E_SETUP;
+    return ARGPARSE_ERROR;
   free(sub);
-  return 0;
+  return ARGPARSE_OK;
 }
 
 /**
@@ -280,7 +281,7 @@ argparse_options_ctor(void **itmdata, void *data)
 
   opt_item = malloc(sizeof(struct argparse_option));
   if (opt_item == NULL)
-    return E_ALLOC;
+    return ARGPARSE_ERROR;
   /* copy non-pointer fields */
   opt_item->type = opt->type;
   opt_item->shortname = opt->shortname;
@@ -297,13 +298,13 @@ argparse_options_ctor(void **itmdata, void *data)
   strcpy(opt_item->help, opt->help);
 
   *itmdata = opt_item;
-  return 0;
+  return ARGPARSE_OK;
   
  err_help:  
   free(opt_item->name);
  err_name:
   free(opt_item);
-  return E_ALLOC;
+  return ARGPARSE_ERROR;
 }
 
 /**
@@ -319,7 +320,7 @@ argparse_options_dtor(void *data)
   if (opt->help)
     free(opt->help);
   free(data);
-  return 0;
+  return ARGPARSE_OK;
 }
 
 /**
@@ -332,7 +333,7 @@ argparse_item_dtor(void *data)
   if (itm->opt->type == T_STRING && itm->str_arg)
     free(itm->str_arg);
   free(data);
-  return 0;
+  return ARGPARSE_OK;
 }
 
 /**
@@ -366,7 +367,7 @@ argparse_cmp_arg(void *data, void *args)
     cmp_args->data = data;
     return 1; /* stop iteration */
   }
-  return 0;
+  return ARGPARSE_OK;
 }
 
 /**
@@ -387,7 +388,7 @@ argparse_cmp_opt(void *data, void *args)
     cmp_args->data = data;
     return 1; /* stop iteration */
   }
-  return 0;
+  return ARGPARSE_OK;
 }
 
 /**
@@ -403,7 +404,7 @@ argparse_find_arg_for_opt(void *data, void *args)
     find_args->item = itm;
     return 1;
   }
-  return 0;
+  return ARGPARSE_OK;
 }
 
 /**
@@ -443,7 +444,7 @@ argparse_check_req_opt(void *data, void *args)
       return 1;
     }
   }
-  return 0; /* keep iterating */
+  return ARGPARSE_OK; /* keep iterating */
 }
 
 /**
@@ -470,7 +471,7 @@ argparse_add_unset_flag(void *data, void *args)
       /* create missing argument */
       item = malloc(sizeof(struct argparse_item));
       if (item == NULL)
-	return E_ALLOC;
+	return ARGPARSE_ERROR;
       item->opt = opt;
       item->int_arg = 0;
       err = list_push(walk_args->ap->args, item);
@@ -480,7 +481,7 @@ argparse_add_unset_flag(void *data, void *args)
       }
     }
   }
-  return 0;
+  return ARGPARSE_OK;
 }
 
 /**
@@ -496,7 +497,7 @@ argparse_help_option(void *data, void *args)
   else
     xlog_msg(logger, "\t-%c,--%s\t\t%s\n", opt->shortname,
 	     opt->name, opt->help);
-  return 0;
+  return ARGPARSE_OK;
 }
 
 /**
@@ -509,7 +510,7 @@ argparse_help_posoption(void *data, void *args)
   struct argparse_option *opt = data;
 
   xlog_msg(logger, "\t%s\t\t\t%s\n", opt->name, opt->help);
-  return 0;
+  return ARGPARSE_OK;
 }
 
 /**
@@ -522,7 +523,7 @@ argparse_help_subcommand(void *data, void *args)
   struct argparse_handle *ap = data;
 
   xlog_msg(logger, "\t%s\t\t%s\n", ap->subcommand_name, ap->subcommand_help);
-  return 0;
+  return ARGPARSE_OK;
 }
 
 /**
@@ -539,7 +540,7 @@ argparse_find_subcommand(void *data, void *args)
     find_args->match = ap;
     return 1; /* stop iteration */
   }
-  return 0;
+  return ARGPARSE_OK;
 }
 
 /**
@@ -575,7 +576,7 @@ static int
 argparse_helpmsg_cbk(void *data, void *args)
 {
   argparse_helpmsg((struct argparse_handle *)data);
-  return 0;
+  return ARGPARSE_OK;
 }
 
 /**
@@ -595,7 +596,8 @@ argparse_helpmsg(argparse_t ap)
  * Initialise an argparse handle for a new parser
  */
 int
-argparse_init(argparse_t *pap, const char *help, argconsumer_t cbk)
+argparse_init(argparse_t *pap, const char *help, argconsumer_t cbk,
+	      void *userdata)
 {
   int error;
   argparse_t ap;
@@ -605,24 +607,25 @@ argparse_init(argparse_t *pap, const char *help, argconsumer_t cbk)
 
   ap = malloc(sizeof(struct argparse_handle));
   if (ap == NULL)
-    return E_ALLOC;
+    return ARGPARSE_ERROR;
   *pap = ap;
 
   /* use subcommand_ctor to do the common initialization */
   error = argparse_subcommand_ctor((void **)pap, ap);
   if (error)
-    return E_SETUP;
+    return ARGPARSE_ERROR;
   ap->cbk = cbk;
+  ap->userdata = userdata;
   ap->subcommand_name = NULL; /* top-level argparser */
   ap->subcommand_help = malloc(strlen(help) + 1);
   if (ap->subcommand_help == NULL) {
     argparse_subcommand_dtor(ap);
     list_destroy(ap->subcommands);
     *pap = NULL;
-    return E_SETUP;
+    return ARGPARSE_ERROR;
   }
   strcpy(ap->subcommand_help, help);
-  return 0;
+  return ARGPARSE_OK;
 }
 
 /*
@@ -648,7 +651,7 @@ argparse_destroy(argparse_t ap)
  */
 argparse_t
 argparse_subcmd_add(argparse_t ap, const char *name, const char *help,
-		    argconsumer_t cbk)
+		    argconsumer_t cbk, void *userdata)
 {
   struct argparse_handle *sub;
   int error;
@@ -671,6 +674,7 @@ argparse_subcmd_add(argparse_t ap, const char *name, const char *help,
   strcpy(sub->subcommand_help, help);
 
   sub->cbk = cbk;
+  sub->userdata = userdata;
   
   error = list_push(ap->subcommands, sub);
   if (error)
@@ -776,10 +780,10 @@ argparse_arg_get(argparse_t ap, const char *name, void *arg, int bufsize)
   if (error)
     return (error);
   if (cmp_args.data == NULL)
-    return E_NOARG;
+    return ARGPARSE_NOARG;
 
   argparse_copyout_arg(cmp_args.data, arg, bufsize);
-  return 0;
+  return ARGPARSE_OK;
 }
 
 /**
@@ -794,10 +798,10 @@ argparse_posarg_get(argparse_t ap, int idx, void *arg, int bufsize)
 
   item = list_getitem(ap->pos_args, idx);
   if (item == NULL)
-    return E_NOARG;
+    return ARGPARSE_NOARG;
 
   argparse_copyout_arg(item, arg, bufsize);
-  return 0;
+  return ARGPARSE_OK;
 }
 
 /**
@@ -815,7 +819,7 @@ argparse_parseopt(struct argparse_item *item, char *arg)
   case T_STRING:
     item->str_arg = malloc(strlen(arg) + 1);
     if (item->str_arg == NULL) {
-      error = E_ALLOC;
+      error = ARGPARSE_ERROR;
       break;
     }
     strcpy(item->str_arg, arg);    
@@ -825,14 +829,14 @@ argparse_parseopt(struct argparse_item *item, char *arg)
     if (int_arg_end == arg) {
       xlog_err(logger, "Invalid type of %s for argument %s (int)\n",
 	       arg, item->opt->name);
-      error = E_PARSE;
+      error = ARGPARSE_ERROR;
     }
     break;
   case T_FLAG:
     item->int_arg = 1;
     break;
   default:
-    error = E_PARSE;
+    error = ARGPARSE_ERROR;
   }
   return (error);
 }
@@ -852,12 +856,12 @@ argparse_parse_posarg(struct argparse_parser_state *st)
   if (opt == NULL) {
     xlog_err(logger, "Extra positional argument %s\n", arg);
     argparse_helpmsg(st->root_cmd);
-    return E_PARSE;
+    return ARGPARSE_ERROR;
   }
   
   item = malloc(sizeof(struct argparse_item));
   if (item == NULL)
-    return E_ALLOC;
+    return ARGPARSE_ERROR;
   item->opt = opt;
 
   error = argparse_parseopt(item, arg);
@@ -870,7 +874,7 @@ argparse_parse_posarg(struct argparse_parser_state *st)
     goto err_push;
 
   ap->curr_posarg += 1;
-  return 0;
+  return ARGPARSE_OK;
   
  err_parse:
  err_push:
@@ -905,7 +909,7 @@ argparse_parse_arg_named(struct argparse_parser_state *st)
   if (*arg == '\0') {
     xlog_err(logger, "Invalid option -\n");
     argparse_helpmsg(st->root_cmd);
-    return E_PARSE;
+    return ARGPARSE_ERROR;
   }
   
   if (is_longopt) {
@@ -924,12 +928,12 @@ argparse_parse_arg_named(struct argparse_parser_state *st)
   if (cmp_args.data == NULL) {
     xlog_err(logger, "Invalid option -%s\n", arg);
     argparse_helpmsg(st->root_cmd);
-    return E_PARSE;
+    return ARGPARSE_ERROR;
   }
 
   item = malloc(sizeof(struct argparse_item));
   if (item == NULL)
-    return E_ALLOC;
+    return ARGPARSE_ERROR;
   item->opt = cmp_args.data;
 
   /* get next argument, holding the value for the option being parsed */
@@ -955,12 +959,12 @@ argparse_parse_arg_named(struct argparse_parser_state *st)
   if (error)
     goto err_push;
 
-  return 0;
+  return ARGPARSE_OK;
   
  err_parse:
  err_push:
   free(item);
-  return E_PARSE;
+  return ARGPARSE_ERROR;
 }
 
 static int
@@ -979,7 +983,7 @@ argparse_check_required(struct argparse_parser_state *st)
       xlog_err(logger, "Missing argument %s\n", opt->name);
       argparse_helpmsg(st->root_cmd);
     }
-    return E_PARSE;
+    return ARGPARSE_ERROR;
   }
   
   cmp_args.ap = ap;
@@ -988,16 +992,16 @@ argparse_check_required(struct argparse_parser_state *st)
   err = list_walk(ap->options, argparse_check_req_opt, &cmp_args);
   if (err == 0) {
     if (cmp_args.opt == NULL)
-      return 0;
+      return ARGPARSE_OK;
     else {
       /* missing item found */
       xlog_err(logger, "Missing required argument %s\n", cmp_args.opt->name);
       argparse_helpmsg(st->root_cmd);
-      return E_PARSE;
+      return ARGPARSE_ERROR;
     }
   }
   else
-    return E_PARSE;
+    return ARGPARSE_ERROR;
 
   /* not reached */
 }
@@ -1020,8 +1024,8 @@ argparse_fixup_flags(struct argparse_parser_state *st)
    */
   err = list_walk(ap->options, argparse_add_unset_flag, &walk_args);
   if (err < 0)
-    return E_PARSE;
-  return 0;
+    return ARGPARSE_ERROR;
+  return ARGPARSE_OK;
 }
 
 /**
@@ -1043,14 +1047,14 @@ argparse_next_subcmd(struct argparse_parser_state *st)
 	     st->current_cmd->subcommand_name, args.name, args.match);
   if (error < 0 || args.match == NULL) {
     xlog_err(logger, "Invalid command %s\n", args.name);
-    return E_PARSE;
+    return ARGPARSE_ERROR;
   }
   error = list_push(st->subcmd_stack, st->current_cmd);
   if (error)
-    return E_PARSE;
+    return ARGPARSE_ERROR;
   st->current_cmd = args.match;
 
-  return 0;
+  return ARGPARSE_OK;
 }
 
 /**
@@ -1065,18 +1069,18 @@ argparse_prev_subcmd(struct argparse_parser_state *st)
 
   if (list_length(st->subcmd_stack) == 0)
     /* already at top level parser */
-    return 0;
+    return ARGPARSE_OK;
   
   curr_ap = list_pop(st->subcmd_stack);
   if (curr_ap == NULL) {
     /* something wrong happened, break */
     xlog_err(logger, "Error popping subcommand from stack\n");
-    return E_PARSE;
+    return ARGPARSE_ERROR;
   }
 
   xlog_debug(logger, "pop back cmd %s\n", curr_ap->subcommand_name);
   st->current_cmd = curr_ap;
-  return 0;
+  return ARGPARSE_OK;
 }
 
 /**
@@ -1099,11 +1103,11 @@ argparse_finalize_subcmd(struct argparse_parser_state *st)
     return error;
   /* invoke user callback to fetch arguments */
   if (st->current_cmd->cbk != NULL) {
-    error = st->current_cmd->cbk(st->current_cmd);
+    error = st->current_cmd->cbk(st->current_cmd, st->current_cmd->userdata);
     if (error)
       return error;
   }
-  return 0;
+  return ARGPARSE_OK;
 }
 
 /** 
@@ -1122,7 +1126,7 @@ argparse_finalize_pop_subcmd(struct argparse_parser_state *st)
   error = argparse_prev_subcmd(st);
   if (error)
     return error;
-  return 0;
+  return ARGPARSE_OK;
 }
 
 int
@@ -1201,10 +1205,10 @@ argparse_parse(argparse_t ap, int argc, char *argv[])
     goto err_dealloc;
 
   list_destroy(state.subcmd_stack);
-  return 0;
+  return ARGPARSE_OK;
 
  err_dealloc:
   list_destroy(state.subcmd_stack);
  err:
-  return E_PARSE;
+  return ARGPARSE_ERROR;
 }

@@ -4,7 +4,7 @@
 static int subcommand_options_cbk_count = 0;
 
 static int
-subcommand_options_cbk(argparse_t ap)
+subcommand_options_cbk(argparse_t ap, void *args)
 {
   subcommand_options_cbk_count++;
   return 0;
@@ -27,14 +27,14 @@ check_args(argparse_t root, argparse_t sub, enum check_args_opt opt)
   /* global args */
   err = argparse_arg_get(root, "arg1", strarg, 64);
   if (opt == ONLY_REQUIRED)
-    assert_int_equal(err, E_NOARG);
+    assert_int_equal(err, ARGPARSE_NOARG);
   else {
     assert_int_equal(err, 0);
     assert_string_equal(strarg, "foo");
   }
   err = argparse_arg_get(root, "arg2", &intarg, 0);
   if (opt == ONLY_REQUIRED)
-    assert_int_equal(err, E_NOARG);
+    assert_int_equal(err, ARGPARSE_NOARG);
   else {
     assert_int_equal(err, 0);
     assert_int_equal(intarg, 10);
@@ -109,7 +109,7 @@ test_subcommand_options_parse(void **state)
   assert(subcommand_options_cbk_count == 0);
   
   sub = argparse_subcmd_add(*state, "my_subcmd", "help msg",
-			    subcommand_options_cbk);
+			    subcommand_options_cbk, NULL);
   assert_non_null(sub);
   err = argparse_arg_add(sub, "arg1", 'a', T_STRING, "", false);
   assert_int_equal(err, 0);
@@ -158,7 +158,7 @@ test_subcommand_required(void **state)
   assert(subcommand_options_cbk_count == 0);
   
   sub = argparse_subcmd_add(*state, "my_subcmd", "help msg",
-			    subcommand_options_cbk);
+			    subcommand_options_cbk, NULL);
   assert_non_null(sub);
   err = argparse_arg_add(sub, "arg1", 'a', T_STRING, "", true);
   assert_int_equal(err, 0);
@@ -212,7 +212,8 @@ test_subcommand_unset_flag(void **state)
   /* check that the test is initialized properly */
   assert(subcommand_options_cbk_count == 0);
   
-  sub = argparse_subcmd_add(*state, "my_subcmd", "help msg", subcommand_options_cbk);
+  sub = argparse_subcmd_add(*state, "my_subcmd", "help msg",
+			    subcommand_options_cbk, NULL);
   assert_non_null(sub);
   err = argparse_arg_add(sub, "arg1", 'a', T_STRING, "", false);
   assert_int_equal(err, 0);
@@ -244,9 +245,9 @@ test_posargs_only_in_subcmd(void **state)
   int argc = 3;
   char *argv[] = {"./a.out", "my_subcmd", "foo"};
 
-  err = argparse_init(&ap, "Test parser", NULL);
+  err = argparse_init(&ap, "Test parser", NULL, NULL);
   assert_int_equal(err, 0);
-  sub = argparse_subcmd_add(ap, "my_subcmd", "Help msg", NULL);
+  sub = argparse_subcmd_add(ap, "my_subcmd", "Help msg", NULL, NULL);
   assert_non_null(sub);
 
   err = argparse_posarg_add(sub, "pos1", T_STRING, "");
@@ -270,11 +271,11 @@ test_ap_nested_parser_success(void **state)
   char strarg[10];
 
   char *argv[] = {"./a.out", "cmd1", "cmd2", "-o", "option"};
-  err = argparse_init(&ap, "Test parser", NULL);
+  err = argparse_init(&ap, "Test parser", NULL, NULL);
   assert_int_equal(err, 0);
 
-  c1 = argparse_subcmd_add(ap, "cmd1", "Command 1", NULL);
-  c2 = argparse_subcmd_add(c1, "cmd2", "Command 2", NULL);
+  c1 = argparse_subcmd_add(ap, "cmd1", "Command 1", NULL, NULL);
+  c2 = argparse_subcmd_add(c1, "cmd2", "Command 2", NULL, NULL);
 
   err = argparse_arg_add(c2, "option", 'o', T_STRING, "Option", false);
   assert_int_equal(err, 0);
@@ -297,11 +298,11 @@ test_ap_nested_parser_posargs_success(void **state)
   char strarg[64];
 
   char *argv[] = {"./a.out", "cmd1", "cmd2", "posarg1", "posarg2"};
-  err = argparse_init(&ap, "Test parser", NULL);
+  err = argparse_init(&ap, "Test parser", NULL, NULL);
   assert_int_equal(err, 0);
 
-  c1 = argparse_subcmd_add(ap, "cmd1", "Command 1", NULL);
-  c2 = argparse_subcmd_add(c1, "cmd2", "Command 2", NULL);
+  c1 = argparse_subcmd_add(ap, "cmd1", "Command 1", NULL, NULL);
+  c2 = argparse_subcmd_add(c1, "cmd2", "Command 2", NULL, NULL);
 
   err = argparse_posarg_add(c2, "pos1", T_STRING, "");
   assert_int_equal(err, 0);
