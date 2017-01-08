@@ -338,6 +338,8 @@ list_iter_item(list_iter_t iter)
 
   if (iter->end)
     return NULL;
+  if (iter->cursor == NULL)
+    return NULL;
   return (void *)iter->cursor->data;
 }
 
