@@ -349,6 +349,8 @@ list_iter_end(list_iter_t iter)
   if (iter == NULL)
     return -1;
 
+  if (iter->cursor == NULL)
+    iter->end = true;
   return iter->end;
 }
 
