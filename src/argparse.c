@@ -12,17 +12,9 @@
 #include "log.h"
 
 /* logger */
-#ifdef ENABLE_LOGGING
-static struct logger_handle _logger = {
-#ifdef DEBUG
-  .level = LOG_DEBUG,
-#else /* ! DEBUG */
-  .level = LOG_ERR,
-#endif /* ! DEBUG */
-  .prefix = "[argparse] ",
-};
+static log_handle(_logger);
+static bool argparse_initialized = false;
 #define logger &_logger
-#endif
 
 struct argparse_item;
 struct argparse_option;
@@ -601,6 +593,17 @@ argparse_init(argparse_t *pap, const char *help, argconsumer_t cbk,
 {
   int error;
   argparse_t ap;
+
+  if (!argparse_initialized) {
+    /* Initialize the logger if not set up already */
+    log_init(logger, NULL);
+#ifdef DEBUG
+    log_option_set(logger, LOG_OPT_LEVEL, LOG_OPT_LEVEL_DEBUG);
+#else /* ! DEBUG */
+    log_option_set(logger, LOG_OPT_LEVEL, LOG_OPT_LEVEL_ERR);
+#endif /* ! DEBUG */
+    log_option_set(logger, LOG_OPT_PREFIX, "[argparse] ");
+  }
 
   if (pap == NULL)
     return -1;
