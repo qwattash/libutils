@@ -1,3 +1,19 @@
+/**
+ * The logger is handled by a layered hierarchy of
+ * loggers. Each logger have the same handle properties
+ * and log messages are propagated up in the logger chain.
+ * Log messages are always propagated and every logger in the chain
+ * has the opportunity to handle the message.
+ * The prefixes are chained toghether when a message is propagated
+ * up in the logger chain.
+ * All loggers specify a backend that defines the
+ * behaviour when a log message is handled.
+ *
+ * The logger handles are opaque and should always be handled
+ * with the log or xlog macros so that all the logging code
+ * is stripped away when logging is disabled.
+ */
+
 #ifndef LOG_H
 #define LOG_H
 
@@ -27,46 +43,120 @@
 /**
  * Logging backend
  *
- * LOG_STDIO: log to stdout and stderr
- * LOG_FILE: log to file
- * LOG_SYSLOG: log using linux syslog
+ * LOG_BACKEND_STDIO: log to stdout and stderr
+ * LOG_BACKEND_FILE: log to file
+ * LOG_BACKEND_SYSLOG: log using linux syslog
+ * LOG_BACKEND_BUBBLE: just bubble to parent logger
  */
 enum log_backend {
   LOG_BACKEND_STDIO,
   LOG_BACKEND_FILE,
   LOG_BACKEND_SYSLOG,
+  LOG_BACKEND_BUBBLE,
+};
+
+/**
+ * Log option types, see macro log_option_set
+ * LOG_OPT_BACKEND: set the backend value
+ * LOG_OPT_PREFIX: set the prefix value,
+ * the prefix string is not deallocated, it is
+ * treated as a constant string.
+ * LOG_OPT_LEVEL: set the logger level
+ * LOG_OPT_FILE: set the log file path
+ */
+enum log_conf_option {
+  LOG_OPT_BACKEND,
+  LOG_OPT_PREFIX,
+  LOG_OPT_LEVEL,
+  LOG_OPT_FILE,
 };
 
 /**
  * Logger handle
+ *
+ * NOTE: This structure is OPAQUE
+ * This should never be handled manually,
+ * instead use the log_handle, log_init, log_option_set
+ * and other log_* and xlog_* macros
  */
 struct logger_handle {
+  struct logger_handle *parent;
   int level;
   enum log_backend backend;
   const char *prefix;
   const char *log_file_path;
-  union {
-    // private fields
-    FILE *log_fd;
-    bool syslog_open;
-  } private;
+  FILE *log_fd;
 };
 
 
 /* private logging functions - use macros */
+typedef struct logger_handle logger_t;
+
+/**
+ * Generic log function
+ * @param logger: the logger handle, if NULL
+ * the output is logged to stdout/stderr with no
+ * filtering
+ * @param lvl: log level of the message
+ * @param fmt: format string
+ * @param vararg: format arguments
+ */
 void _log(struct logger_handle *logger, int lvl,
 	  const char *fmt, ...);
 
+/**
+ * Log handle initializer, add the logger to the logger
+ * hierarchy with the given parent.
+ * @param logger: the handle to initialize
+ * @param parent: the parent logger, can be NULL
+ */
+void _log_init(struct logger_handle *logger,
+	       struct logger_handle *parent);
+
+/**
+ * Configure logger parameters
+ * @param logger: the logger handle
+ * @param opt: the option to configure
+ * @param value: the value of the option or pointer to it
+ */
+void _log_option_set(struct logger_handle *logger,
+		     enum log_conf_option opt, const void *value);
+
+/* 
+ * common log option values to avoid having to specify a variable 
+ * all the times
+ */
+
+const int log_opt_lvl_debug;
+const int log_opt_lvl_info;
+const int log_opt_lvl_warning;
+const int log_opt_lvl_err;
+const int log_opt_lvl_alert;
+const int log_opt_lvl_none;
+
+#define LOG_OPT_LEVEL_DEBUG (const void *)&log_opt_lvl_debug
+#define LOG_OPT_LEVEL_INFO (const void *)&log_opt_lvl_info
+#define LOG_OPT_LEVEL_WARNING (const void *)&log_opt_lvl_warning
+#define LOG_OPT_LEVEL_ERR (const void *)&log_opt_lvl_err
+#define LOG_OPT_LEVEL_ALERT (const void *)&log_opt_lvl_alert
+#define LOG_OPT_LEVEL_NONE (const void *)&log_opt_lvl_none
+
+const enum log_backend log_opt_backend_stdio;
+const enum log_backend log_opt_backend_file;
+const enum log_backend log_opt_backend_syslog;
+const enum log_backend log_opt_backend_bubble;
+
+#define LOG_OPT_BACKEND_STDIO (const void *)&log_opt_backend_stdio
+#define LOG_OPT_BACKEND_FILE (const void *)&log_opt_backend_file
+#define LOG_OPT_BACKEND_SYSLOG (const void *)&log_opt_backend_syslog
+#define LOG_OPT_BACKEND_BUBBLE (const void *)&log_opt_backend_bubble
+
+/* public logging API */
 #ifdef ENABLE_LOGGING
 
-/* macro to create instance of logger handle */
-#define LOG_HANDLE(level, prefix) {		\
-    level,					\
-    LOG_BACKEND_STDIO,				\
-    prefix,					\
-    NULL,					\
-    {.log_fd = NULL},				\
-  }
+#define log_handle(name) logger_t name
+#define log_init(hnd, parent) _log_init(hnd, parent)
+#define log_option_set(hnd, opt, value) _log_option_set(hnd, opt, value)
 
 #ifdef LOG_NODEBUG
 #define log_debug(fmt, ...)
@@ -92,7 +182,9 @@ void _log(struct logger_handle *logger, int lvl,
 
 #else /* ! ENABLE_LOGGING */
 
-#define LOG_HANDLE(name, level, prefix) 0
+#define log_handle(name) (void)0
+#define log_init(hnd, parent) (void)0
+#define log_option_set(hnd, opt, value) (void)0
 
 #define log_debug(fmt, ...) (void)0
 #define log_info(fmt, ...) (void)0

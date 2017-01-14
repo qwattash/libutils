@@ -105,18 +105,6 @@ __wrap_setvbuf(FILE *fd, char *buffer, int mode, size_t size)
 
 #ifdef HAVE_SYSLOG_H
 /*
- * mock syslog open file
- */
-void
-__wrap_openlog(const char *ident, int opts, int facility)
-{
-  
-  mock_ptr_type(struct expect *);
-  assert_ptr_equal(ident, NULL);
-  assert_int_equal(opts, 0);
-  assert_int_equal(facility, LOG_DAEMON);
-}
-/*
  * mock syslog logging function
  */
 void
@@ -179,10 +167,13 @@ test_log(void **state)
 static void
 test_log_handle(void **state)
 {
-  struct logger_handle logger_struct = LOG_HANDLE(LOG_DEBUG, "prefix");
-
+  log_handle(logger_struct);
   struct logger_handle *logger = &logger_struct;
   struct expect e;
+
+  log_init(logger, NULL);
+  log_option_set(logger, LOG_OPT_LEVEL, LOG_OPT_LEVEL_DEBUG);
+  log_option_set(logger, LOG_OPT_PREFIX, "prefix");
 
   e.fd = stdout;
   e.message = "debug message %d";
@@ -290,7 +281,6 @@ static void mock_setup(struct xlog_state *st, int lvl)
       will_return(__wrap_setvbuf, &st->result);
     }
     if (st->logger.backend == LOG_BACKEND_SYSLOG) {
-      will_return(__wrap_openlog, &st->result);
       will_return(__wrap_vsyslog, &st->result);
     }
     else {
@@ -312,8 +302,8 @@ xlog_setup_stdio(void **state)
 {
   struct xlog_state *st = *state;
   printf("Backend: STDIO\n");
-  st->logger.backend = LOG_BACKEND_STDIO;
-  st->logger.prefix = NULL;
+  log_option_set(&st->logger, LOG_OPT_BACKEND, LOG_OPT_BACKEND_STDIO);
+  log_option_set(&st->logger, LOG_OPT_PREFIX, NULL);
   st->result.fd = stdout;
   return 0;
 }
@@ -344,7 +334,7 @@ xlog_setup_stdio_prefix(void **state)
 {
   struct xlog_state *st = *state;
   xlog_setup_stdio(state);
-  st->logger.prefix = "stdio prefix";
+  log_option_set(&st->logger, LOG_OPT_PREFIX, "stdio prefix");
   st->result.prefix = "stdio prefix";
   return 0;
 }
@@ -375,10 +365,10 @@ xlog_setup_file(void **state)
 {
   struct xlog_state *st = *state;
   printf("Backend: FILE\n");
-  st->logger.backend = LOG_BACKEND_FILE;
-  st->logger.private.log_fd = NULL;
-  st->logger.prefix = NULL;
-  st->logger.log_file_path = "path/to/log/file.txt";
+  log_option_set(&st->logger, LOG_OPT_BACKEND, LOG_OPT_BACKEND_FILE);
+  log_option_set(&st->logger, LOG_OPT_PREFIX, NULL);
+  log_option_set(&st->logger, LOG_OPT_FILE, "path/to/log/file.txt");
+  st->logger.log_fd = NULL;
   st->result.log_file_path = "path/to/log/file.txt";
   st->result.fd = mock_fd;
   st->result.log_file_mode = "w";
@@ -396,7 +386,7 @@ xlog_setup_file_prefix(void **state)
 {
   struct xlog_state *st = *state;
   xlog_setup_file(state);
-  st->logger.prefix = "file backend prefix";
+  log_option_set(&st->logger, LOG_OPT_PREFIX, "file backend prefix");
   st->result.prefix = "file backend prefix";
   return 0;
 }
@@ -411,10 +401,8 @@ xlog_setup_syslog(void **state)
 {
   struct xlog_state *st = *state;
   printf("Backend: SYSLOG\n");
-  st->logger.backend = LOG_BACKEND_SYSLOG;
-  st->logger.private.syslog_open = false;
-  st->logger.prefix = NULL;
-  st->logger.log_file_path = NULL;
+  log_option_set(&st->logger, LOG_OPT_BACKEND, LOG_OPT_BACKEND_SYSLOG);
+  log_option_set(&st->logger, LOG_OPT_PREFIX, NULL);
   st->result.log_file_path = NULL;
   st->result.fd = mock_fd;
   st->result.log_file_mode = NULL;
@@ -432,7 +420,7 @@ xlog_setup_syslog_prefix(void **state)
 {
   struct xlog_state *st = *state;
   xlog_setup_syslog(state);
-  st->logger.prefix = "syslog backend prefix";
+  log_option_set(&st->logger, LOG_OPT_PREFIX, "syslog backend prefix");
   st->result.prefix = "syslog backend prefix";
   return 0;
 }
@@ -449,7 +437,8 @@ xlog_setup_group_none(void **state)
 {
   struct xlog_state *st = malloc(sizeof(struct xlog_state));
   assert(st != NULL);
-  st->logger.level = LOG_NONE;
+  log_init(&st->logger, NULL);
+  log_option_set(&st->logger, LOG_OPT_LEVEL, LOG_OPT_LEVEL_NONE);
   *state = st;
   return 0;
 }
@@ -459,7 +448,8 @@ xlog_setup_group_msg(void **state)
 {
   struct xlog_state *st = malloc(sizeof(struct xlog_state));
   assert(st != NULL);
-  st->logger.level = LOG_ALERT;
+  log_init(&st->logger, NULL);
+  log_option_set(&st->logger, LOG_OPT_LEVEL, LOG_OPT_LEVEL_ALERT);
   *state = st;
   return 0;
 }
@@ -469,7 +459,8 @@ xlog_setup_group_err(void **state)
 {
   struct xlog_state *st = malloc(sizeof(struct xlog_state));
   assert(st != NULL);
-  st->logger.level = LOG_ERR;
+  log_init(&st->logger, NULL);
+  log_option_set(&st->logger, LOG_OPT_LEVEL, LOG_OPT_LEVEL_ERR);
   *state = st;
   return 0;
 }
@@ -479,7 +470,8 @@ xlog_setup_group_warn(void **state)
 {
   struct xlog_state *st = malloc(sizeof(struct xlog_state));
   assert(st != NULL);
-  st->logger.level = LOG_WARNING;
+  log_init(&st->logger, NULL);
+  log_option_set(&st->logger, LOG_OPT_LEVEL, LOG_OPT_LEVEL_WARNING);
   *state = st;
   return 0;
 }
@@ -489,7 +481,8 @@ xlog_setup_group_info(void **state)
 {
   struct xlog_state *st = malloc(sizeof(struct xlog_state));
   assert(st != NULL);
-  st->logger.level = LOG_INFO;
+  log_init(&st->logger, NULL);
+  log_option_set(&st->logger, LOG_OPT_LEVEL, LOG_OPT_LEVEL_INFO);
   *state = st;
   return 0;
 }
@@ -499,7 +492,8 @@ xlog_setup_group_debug(void **state)
 {
   struct xlog_state *st = malloc(sizeof(struct xlog_state));
   assert(st != NULL);
-  st->logger.level = LOG_DEBUG;
+  log_init(&st->logger, NULL);
+  log_option_set(&st->logger, LOG_OPT_LEVEL, LOG_OPT_LEVEL_INFO);
   *state = st;
   return 0;
 }
