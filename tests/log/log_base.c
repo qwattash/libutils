@@ -39,21 +39,6 @@ FILE *mock_fd = (FILE*) 0x1000;
 static void mock_setup(struct xlog_state *st, int lvl);
 
 /*
- * mock fprintf
- */
-int
-__wrap_fprintf(FILE *fd, const char *fmt, ...)
-{
-  struct expect *result;
-
-  result = mock_ptr_type(struct expect *);
-
-  assert_ptr_equal(fd, result->fd);
-  assert_string_equal(fmt, result->prefix);
-  return strlen(fmt);
-}
-
-/*
  * mock vfprintf
  */
 int
@@ -115,13 +100,6 @@ __wrap_vsyslog(int lvl, const char *fmt, va_list va)
   
   result = mock_ptr_type(struct expect *);
 
-  if (result->prefix != NULL) {
-    /* check that the prefix is in fmt and advance fmt pointer */
-    if (strncmp(result->prefix, fmt, strlen(result->prefix)) != 0)
-      fail_msg("SYSLOG logger prefix does not match: "\
-	       "expected prefix %s found %s\n", result->prefix, fmt);
-    fmt += strlen(result->prefix);
-  }
   assert_string_equal(fmt, result->message);
   arg = va_arg(va, int);
   assert_int_equal(arg, result->argument);
@@ -174,34 +152,30 @@ test_log_handle(void **state)
   log_init(logger, NULL);
   log_option_set(logger, LOG_OPT_LEVEL, LOG_OPT_LEVEL_DEBUG);
   log_option_set(logger, LOG_OPT_PREFIX, "prefix");
+  log_option_set(logger, LOG_OPT_MSG_FMT, "%s %s");
 
   e.fd = stdout;
-  e.message = "debug message %d";
+  e.message = "prefix debug message %d";
   e.prefix = "prefix";
   e.argument = 10;
 
-  will_return(__wrap_fprintf, &e);
   will_return(__wrap_vfprintf, &e);
   xlog_debug(logger, "debug message %d", 10);
 
-  e.message = "info message %d";
-  will_return(__wrap_fprintf, &e);
+  e.message = "prefix info message %d";
   will_return(__wrap_vfprintf, &e);
   xlog_info(logger, "info message %d", 10);
 
-  e.message = "warning message %d";
-  will_return(__wrap_fprintf, &e);
+  e.message = "prefix warning message %d";
   will_return(__wrap_vfprintf, &e);
   xlog_warn(logger, "warning message %d", 10);
 
-  e.message = "user message %d";
-  will_return(__wrap_fprintf, &e);
+  e.message = "prefix user message %d";
   will_return(__wrap_vfprintf, &e);
   xlog_msg(logger, "user message %d", 10);
 
   e.fd = stderr;
-  e.message = "error message %d";
-  will_return(__wrap_fprintf, &e);
+  e.message = "prefix error message %d";
   will_return(__wrap_vfprintf, &e);
   xlog_err(logger, "error message %d", 10);
 }
@@ -213,8 +187,11 @@ static void
 test_xlog_msg(void **state)
 {
   struct xlog_state *st = *state;
+  char message[1024];
+  sprintf(message, "%s %s", st->result.prefix, "logging %d at level MSG");
+  
   mock_setup(st, LOG_ALERT);
-  st->result.message = "logging %d at level MSG";
+  st->result.message = message;
   st->result.argument = 1;
   xlog_msg(&st->logger, "logging %d at level MSG", 1);
 }
@@ -223,8 +200,11 @@ static void
 test_xlog_err(void **state)
 {
   struct xlog_state *st = *state;
+  char message[1024];
+  sprintf(message, "%s %s", st->result.prefix, "logging %d at level ERR");
+
   mock_setup(st, LOG_ERR);
-  st->result.message = "logging %d at level ERR";
+  st->result.message = message;
   st->result.argument = 10;
   xlog_err(&st->logger, "logging %d at level ERR", 10);
 }
@@ -233,8 +213,11 @@ static void
 test_xlog_warn(void **state)
 {
   struct xlog_state *st = *state;
+  char message[1024];
+  sprintf(message, "%s %s", st->result.prefix, "logging %d at level WARN");
+  
   mock_setup(st, LOG_WARNING);
-  st->result.message = "logging %d at level WARN";
+  st->result.message = message;
   st->result.argument = 100;
   xlog_warn(&st->logger, "logging %d at level WARN", 100);
 }
@@ -243,8 +226,11 @@ static void
 test_xlog_info(void **state)
 {
   struct xlog_state *st = *state;
+  char message[1024];
+  sprintf(message, "%s %s", st->result.prefix, "logging %d at level INFO");
+  
   mock_setup(st, LOG_INFO);
-  st->result.message = "logging %d at level INFO";
+  st->result.message = message;
   st->result.argument = 1000;
   xlog_info(&st->logger, "logging %d at level INFO", 1000);
 }
@@ -253,8 +239,11 @@ static void
 test_xlog_debug(void **state)
 {
   struct xlog_state *st = *state;
+  char message[1024];
+  sprintf(message, "%s %s", st->result.prefix, "logging %d at level DEBUG");
+
   mock_setup(st, LOG_DEBUG);
-  st->result.message = "logging %d at level DEBUG";
+  st->result.message = message;
   st->result.argument = 10000;
   xlog_debug(&st->logger, "logging %d at level DEBUG", 10000);
 }
@@ -283,11 +272,8 @@ static void mock_setup(struct xlog_state *st, int lvl)
     if (st->logger.backend == LOG_BACKEND_SYSLOG) {
       will_return(__wrap_vsyslog, &st->result);
     }
-    else {
+    else
       will_return(__wrap_vfprintf, &st->result);
-      if (st->logger.prefix != NULL)
-	will_return(__wrap_fprintf, &st->result);
-    }
   }
 }
 
@@ -305,6 +291,7 @@ xlog_setup_stdio(void **state)
   log_option_set(&st->logger, LOG_OPT_BACKEND, LOG_OPT_BACKEND_STDIO);
   log_option_set(&st->logger, LOG_OPT_PREFIX, NULL);
   st->result.fd = stdout;
+  st->result.prefix = "";
   return 0;
 }
 
@@ -372,6 +359,7 @@ xlog_setup_file(void **state)
   st->result.log_file_path = "path/to/log/file.txt";
   st->result.fd = mock_fd;
   st->result.log_file_mode = "w";
+  st->result.prefix = "";
   return 0;
 }
 
@@ -406,7 +394,7 @@ xlog_setup_syslog(void **state)
   st->result.log_file_path = NULL;
   st->result.fd = mock_fd;
   st->result.log_file_mode = NULL;
-  st->result.prefix = NULL;
+  st->result.prefix = "";
   return 0;
 }
 
@@ -439,6 +427,7 @@ xlog_setup_group_none(void **state)
   assert(st != NULL);
   log_init(&st->logger, NULL);
   log_option_set(&st->logger, LOG_OPT_LEVEL, LOG_OPT_LEVEL_NONE);
+  log_option_set(&st->logger, LOG_OPT_MSG_FMT, "%s %s");
   *state = st;
   return 0;
 }
@@ -450,6 +439,7 @@ xlog_setup_group_msg(void **state)
   assert(st != NULL);
   log_init(&st->logger, NULL);
   log_option_set(&st->logger, LOG_OPT_LEVEL, LOG_OPT_LEVEL_ALERT);
+  log_option_set(&st->logger, LOG_OPT_MSG_FMT, "%s %s");
   *state = st;
   return 0;
 }
@@ -461,6 +451,7 @@ xlog_setup_group_err(void **state)
   assert(st != NULL);
   log_init(&st->logger, NULL);
   log_option_set(&st->logger, LOG_OPT_LEVEL, LOG_OPT_LEVEL_ERR);
+  log_option_set(&st->logger, LOG_OPT_MSG_FMT, "%s %s");
   *state = st;
   return 0;
 }
@@ -472,6 +463,7 @@ xlog_setup_group_warn(void **state)
   assert(st != NULL);
   log_init(&st->logger, NULL);
   log_option_set(&st->logger, LOG_OPT_LEVEL, LOG_OPT_LEVEL_WARNING);
+  log_option_set(&st->logger, LOG_OPT_MSG_FMT, "%s %s");
   *state = st;
   return 0;
 }
@@ -483,6 +475,7 @@ xlog_setup_group_info(void **state)
   assert(st != NULL);
   log_init(&st->logger, NULL);
   log_option_set(&st->logger, LOG_OPT_LEVEL, LOG_OPT_LEVEL_INFO);
+  log_option_set(&st->logger, LOG_OPT_MSG_FMT, "%s %s");
   *state = st;
   return 0;
 }
@@ -494,6 +487,7 @@ xlog_setup_group_debug(void **state)
   assert(st != NULL);
   log_init(&st->logger, NULL);
   log_option_set(&st->logger, LOG_OPT_LEVEL, LOG_OPT_LEVEL_INFO);
+  log_option_set(&st->logger, LOG_OPT_MSG_FMT, "%s %s");
   *state = st;
   return 0;
 }

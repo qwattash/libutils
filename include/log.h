@@ -63,12 +63,17 @@ enum log_backend {
  * treated as a constant string.
  * LOG_OPT_LEVEL: set the logger level
  * LOG_OPT_FILE: set the log file path
+ * LOG_OPT_FMT: set the format string used to generate
+ * the log message. The fmt string must accept 3 string
+ * arguments (prefix, prefix_chain, message)
  */
 enum log_conf_option {
   LOG_OPT_BACKEND,
   LOG_OPT_PREFIX,
   LOG_OPT_LEVEL,
   LOG_OPT_FILE,
+  LOG_OPT_MSG_FMT,
+  LOG_OPT_PREFIX_FMT,
 };
 
 /**
@@ -80,11 +85,25 @@ enum log_conf_option {
  * and other log_* and xlog_* macros
  */
 struct logger_handle {
+  /* parent logger */
   struct logger_handle *parent;
+  /* log level used to filter messages */
   int level;
+  /* backend to use for messages handled */
   enum log_backend backend;
+  /* message prefix */
   const char *prefix;
+  /* path of the logfile when the backend is FILE */
   const char *log_file_path;
+  /* format string that renders a log message
+   * needs two string (%s) parameters (prefix, message)
+   */
+  const char *msg_fmt;
+  /* format string used to compose the prefix from
+   * a bubbled prefix from a sub-logger
+   */
+  const char *prefix_chain_fmt;
+  /* log file fd for the FILE backend */
   FILE *log_fd;
 };
 

@@ -36,6 +36,8 @@ _log_init(struct logger_handle *logger, struct logger_handle *parent)
   logger->prefix = NULL;
   logger->log_file_path = NULL;
   logger->log_fd = NULL;
+  logger->msg_fmt = "[%s] %s";
+  logger->prefix_chain_fmt = "%s:%s";
 }
 
 void
@@ -67,6 +69,12 @@ _log_option_set(struct logger_handle *logger, enum log_conf_option opt,
   case LOG_OPT_FILE:
     logger->log_file_path = (const char *)value;
     break;
+  case LOG_OPT_MSG_FMT:
+    logger->msg_fmt = (const char *)value;
+    break;
+  case LOG_OPT_PREFIX_FMT:
+    logger->prefix_chain_fmt = (const char *)value;
+    break;
   default:
     log_err("Invalid log option %d\n", opt);
   }
@@ -88,32 +96,38 @@ _vlog(struct logger_handle *logger, int lvl, const char *prefix_chain,
   enum log_backend backend;
   FILE *fd;
   char *prefix = NULL;
-#ifdef HAVE_SYSLOG_H
-  char *syslog_msg;
-#endif
+  char *msg;
 
-  /* build prefix 
-   * XXX we should use a cache/hashmap of prefixes or a faster way
-   * of building them
-   */
+  /* build prefix */
   if (logger != NULL) {
     if (prefix_chain == NULL)
       prefix = (char *)logger->prefix;
     else {
-      prefix = alloca(strlen(prefix_chain) + strlen(logger->prefix) + 1);
-      if (prefix != NULL) {
-	strcpy(prefix, logger->prefix);
-	strcat(prefix, prefix_chain);
-      }	
-    }      
+      prefix = alloca(strlen(prefix_chain) + strlen(logger->prefix) +
+		      strlen(logger->prefix_chain_fmt) + 1);
+      if (prefix != NULL)
+	sprintf(prefix, logger->prefix_chain_fmt, logger->prefix,
+		prefix_chain);
+    }
   }
-  
-  if (logger != NULL && logger->level >= lvl) {
 
-    if (logger == NULL)
+  /* prevent any undefined prefix */
+  if (prefix == NULL)
+    prefix = "";
+  
+  if (logger == NULL || logger->level >= lvl) {
+
+    if (logger == NULL) {
       backend = LOG_BACKEND_STDIO;
-    else
+      msg = (char *)fmt;
+    }
+    else {
       backend = logger->backend;
+      printf("prefix: %s\n", prefix);
+      msg = alloca(strlen(fmt) + strlen(prefix) +
+		   strlen(logger->msg_fmt) + 1);
+      sprintf(msg, logger->msg_fmt, prefix, fmt);
+    }
   
     switch (backend) {
     case LOG_BACKEND_STDIO:
@@ -121,9 +135,7 @@ _vlog(struct logger_handle *logger, int lvl, const char *prefix_chain,
 	fd = stderr;
       else
 	fd = stdout;
-      if (prefix != NULL)
-	fprintf(fd, prefix);
-      vfprintf(fd, fmt, va);
+      vfprintf(fd, msg, va);
       break;
     case LOG_BACKEND_FILE:
       if (logger->log_fd == NULL) {
@@ -138,26 +150,12 @@ _vlog(struct logger_handle *logger, int lvl, const char *prefix_chain,
 	  break;
 	}
       }
-      if (prefix != NULL)
-	fprintf(logger->log_fd, prefix);
-      vfprintf(logger->log_fd, fmt, va);
+      vfprintf(logger->log_fd, msg, va);
       break;
+    case LOG_BACKEND_SYSLOG:
 #ifdef HAVE_SYSLOG_H
-    case LOG_BACKEND_SYSLOG:
-      if (prefix != NULL) {
-	syslog_msg = malloc(strlen(prefix) + strlen(fmt) + 1);
-	if (syslog_msg == NULL)
-	  break;
-	strcpy(syslog_msg, prefix);
-	strcat(syslog_msg, fmt);
-	vsyslog(lvl, syslog_msg, va);
-	free(syslog_msg);
-      }
-      else
-	vsyslog(lvl, fmt, va);
+      vsyslog(lvl, msg, va);
       break;
-#else
-    case LOG_BACKEND_SYSLOG:
 #endif
     case LOG_BACKEND_BUBBLE:
       /* just fall through */
