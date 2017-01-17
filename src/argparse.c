@@ -602,7 +602,7 @@ argparse_init(argparse_t *pap, const char *help, argconsumer_t cbk,
 #else /* ! DEBUG */
     log_option_set(logger, LOG_OPT_LEVEL, LOG_OPT_LEVEL_ERR);
 #endif /* ! DEBUG */
-    log_option_set(logger, LOG_OPT_PREFIX, "[argparse] ");
+    log_option_set(logger, LOG_OPT_PREFIX, "argparse");
   }
 
   if (pap == NULL)

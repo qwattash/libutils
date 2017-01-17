@@ -123,7 +123,6 @@ _vlog(struct logger_handle *logger, int lvl, const char *prefix_chain,
     }
     else {
       backend = logger->backend;
-      printf("prefix: %s\n", prefix);
       msg = alloca(strlen(fmt) + strlen(prefix) +
 		   strlen(logger->msg_fmt) + 1);
       sprintf(msg, logger->msg_fmt, prefix, fmt);
