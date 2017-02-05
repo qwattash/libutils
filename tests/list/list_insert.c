@@ -71,7 +71,7 @@ test_list_append_empty(void **state)
   assert_int_equal(ctor_count, 1);
   assert_int_equal(dtor_count, 0);
   assert_int_equal(list_length(*state), 1);
-  item = list_getitem(*state, 0);
+  item = list_get(*state, 0);
   assert_string_equal(item, "item");
 }
 
@@ -87,7 +87,7 @@ test_list_append_full(void **state)
   assert_int_equal(ctor_count, 5);
   assert_int_equal(dtor_count, 0);
   assert_int_equal(list_length(*state), 5);
-  item = list_getitem(*state, 4);
+  item = list_get(*state, 4);
   assert_string_equal(item, "appended");
 }
 
@@ -104,11 +104,11 @@ test_list_append_ordering(void **state)
   err = list_append(*state, "e2");
   assert_int_equal(err, 0);
 
-  item = list_getitem(*state, 0);
+  item = list_get(*state, 0);
   assert_string_equal(item, "e0");
-  item = list_getitem(*state, 1);
+  item = list_get(*state, 1);
   assert_string_equal(item, "e1");
-  item = list_getitem(*state, 2);
+  item = list_get(*state, 2);
   assert_string_equal(item, "e2");
 }
 
@@ -125,11 +125,11 @@ test_list_push_ordering(void **state)
   err = list_push(*state, "e2");
   assert_int_equal(err, 0);
 
-  item = list_getitem(*state, 0);
+  item = list_get(*state, 0);
   assert_string_equal(item, "e2");
-  item = list_getitem(*state, 1);
+  item = list_get(*state, 1);
   assert_string_equal(item, "e1");
-  item = list_getitem(*state, 2);
+  item = list_get(*state, 2);
   assert_string_equal(item, "e0");
 }
 

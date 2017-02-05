@@ -8,8 +8,8 @@
 
 #include <cmocka.h>
 
-#include "utils_config.h"
-#include "log.h"
+#include "libutils/config.h"
+#include "libutils/log.h"
 
 /* stdio wrappers */
 

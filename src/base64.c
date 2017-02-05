@@ -4,7 +4,7 @@
 
 #include <stdio.h>
 
-#include "base64.h"
+#include "libutils/base64.h"
 
 #define B64_PAD '='
 

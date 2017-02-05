@@ -6,7 +6,8 @@
 
 #include <string.h>
 
-#include "list.h"
+#include "libutils/error.h"
+#include "libutils/list.h"
 
 #ifndef LIST_TEST_H
 #define LIST_TEST_H
@@ -21,21 +22,21 @@ ctor(void **item, void *data)
 {
   ctor_count++;
   *item = data;
-  return 0;
+  return UTILS_OK;
 }
 
 static int
 dtor(void *data)
 {
   dtor_count++;
-  return 0;
+  return UTILS_OK;
 }
 
 static int
 list_walk_cbk(void *item, void *args)
 {
   walk_count++;
-  return 0;
+  return UTILS_OK;
 }
 
 static int

@@ -9,13 +9,13 @@ test_list_insert_remove(void **state)
 
   /* insert elements in the list */
   err = list_insert(*state, "0", 0);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, UTILS_OK);
   assert_int_equal(list_length(*state), 1);
   err = list_insert(*state, "1", 1);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, UTILS_OK);
   assert_int_equal(list_length(*state), 2);
   err = list_insert(*state, "2", 2);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, UTILS_OK);
   assert_int_equal(list_length(*state), 3);
   assert_int_equal(ctor_count, 3);
   assert_int_equal(dtor_count, 0);
@@ -67,28 +67,28 @@ test_list_delete(void **state)
   assert_int_equal(list_length(lst), 4);
 
   err = list_delete(lst, 2);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, UTILS_OK);
   assert_int_equal(list_length(lst), 3);
   assert_int_equal(dtor_count, 1);
   
   err = list_delete(lst, 2);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, UTILS_OK);
   assert_int_equal(list_length(lst), 2);
   assert_int_equal(dtor_count, 2);
 
   /* delete unexisting fails */
   err = list_delete(lst, 2);
-  assert_int_equal(err, -1);
+  assert_int_equal(err, UTILS_ERROR);
   assert_int_equal(list_length(lst), 2);
   assert_int_equal(dtor_count, 2);
 
   err = list_delete(lst, 1);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, UTILS_OK);
   assert_int_equal(list_length(lst), 1);
   assert_int_equal(dtor_count, 3);
 
   err = list_delete(lst, 0);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, UTILS_OK);
   assert_int_equal(list_length(lst), 0);
   assert_int_equal(dtor_count, 4);
 }

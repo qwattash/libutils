@@ -11,23 +11,23 @@ test_list_inv_hnd(void **state)
 
   /* invalid list handle to all list functions */
   err = list_init(NULL, NULL, NULL);
-  assert_int_equal(err, -1);
+  assert_int_equal(err, UTILS_ERROR);
   err = list_destroy(NULL);
-  assert_int_equal(err, -1);
+  assert_int_equal(err, UTILS_ERROR);
   err = list_walk(NULL, &list_walk_cbk, NULL);
-  assert_int_equal(err, -1);
+  assert_int_equal(err, UTILS_ERROR);
   err = list_push(NULL, &data);
-  assert_int_equal(err, -1);
+  assert_int_equal(err, UTILS_ERROR);
   err = list_insert(NULL, &data, 0);
-  assert_int_equal(err, -1);
+  assert_int_equal(err, UTILS_ERROR);
   err = list_delete(NULL, 0);
-  assert_int_equal(err, -1);
+  assert_int_equal(err, UTILS_ERROR);
 
   perr = list_pop(NULL);
   assert_ptr_equal(perr, NULL);
   perr = list_remove(NULL, 0);
   assert_ptr_equal(perr, NULL);
-  perr = list_getitem(NULL, 0);
+  perr = list_get(NULL, 0);
   assert_ptr_equal(perr, NULL);
 }
 
@@ -40,9 +40,9 @@ test_list_init_destroy(void **state)
   /* check list initialization and destroy */
   err = list_init(&lst, NULL, NULL);
   assert_ptr_not_equal(lst, NULL);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, UTILS_OK);
   err = list_destroy(lst);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, UTILS_OK);
 }
 
 static void
@@ -52,12 +52,12 @@ test_list_full_destroy(void **state)
   int err;
   /* check deallocation of non-empty list */
   err = list_init(&lst, NULL, NULL);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, UTILS_OK);
   assert_ptr_not_equal(lst, NULL);
   err = list_push(lst, "0");
-  assert_int_equal(err, 0);
+  assert_int_equal(err, UTILS_OK);
   err = list_destroy(lst);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, UTILS_OK);
 }
 
 int

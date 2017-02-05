@@ -3,8 +3,8 @@
 #include <stdarg.h>
 #include <string.h>
 
-#include "utils_config.h"
-#include "log.h"
+#include "libutils/config.h"
+#include "libutils/log.h"
 
 /* common log options */
 const int log_opt_lvl_debug = LOG_DEBUG;

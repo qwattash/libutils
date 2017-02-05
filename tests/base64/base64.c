@@ -6,7 +6,7 @@
 
 #include <string.h>
 
-#include "base64.h"
+#include "libutils/base64.h"
 
 
 static void

@@ -21,7 +21,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#include "utils_config.h"
+#include "libutils/config.h"
 
 #ifdef HAVE_SYSLOG_H
 /* Include the definition of log levels */
@@ -201,7 +201,7 @@ const enum log_backend log_opt_backend_bubble;
 
 #else /* ! ENABLE_LOGGING */
 
-#define log_handle(name) (void)0
+#define log_handle(name) 
 #define log_init(hnd, parent) (void)0
 #define log_option_set(hnd, opt, value) (void)0
 
