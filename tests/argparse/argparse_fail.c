@@ -15,7 +15,7 @@ test_ap_parse_fail_required(void **state)
   int err;
 
   err = argparse_arg_add(*state, "req", 'r', T_STRING, "", true);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   err = argparse_parse(*state, argc, argv);
   assert_int_equal(err, ARGPARSE_ERROR);
@@ -81,7 +81,7 @@ test_ap_parse_empty_string_param(void **state)
   int err;
 
   err = argparse_arg_add(*state, "string", 's', T_STRING, "", false);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   err = argparse_parse(*state, argc, argv);
   assert_int_equal(err, ARGPARSE_ERROR);

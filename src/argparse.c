@@ -7,14 +7,17 @@
 #include <string.h>
 #include <assert.h>
 
-#include "list.h"
-#include "argparse.h"
-#include "log.h"
+#include "libutils/error.h"
+#include "libutils/list.h"
+#include "libutils/argparse.h"
+#include "libutils/log.h"
 
 /* logger */
 static log_handle(_logger);
+static log_handle(_stdlogger);
 static bool argparse_initialized = false;
 #define logger &_logger
+#define stdlogger &_stdlogger
 
 struct argparse_item;
 struct argparse_option;
@@ -60,78 +63,6 @@ struct argparse_handle {
 };
 
 /*
- * list walker callback arguments to
- * compare and find an element in the handle.args and
- * handle.pos_args lists.
- * Used by argparse_cmp_arg.
- */
-struct argparse_cmp_args {
-  /* [in] long name of the option associated to the argument. */
-  const char *name;
-  /* [out] pointer to the first matching item in the list with
-   * the given name.
-   */
-  struct argparse_item *data;
-};
-
-/*
- * list walker callback arguments to
- * compare and find an element in the handle.options and
- * handle.pos_options lists.
- * if either the shortname or longname match, the option
- * is returned in the cmp_args.data pointer.
- * Used by argparse_cmp_opt.
- */
-struct argparse_opt_cmp_args {
-  /* [in] short name of the option */
-  char shortname;
-  /* [in] long name of the option */
-  const char *longname;
-  /* [out] pointer to the first matching item in the list with
-   * the given name.
-   */
-  struct argparse_option *data;
-};
-
-/*
- * list walker callback arguments to find a
- * subcommand given its name
- */
-struct argparse_find_subcommand_args {
-  /* [in] name of the subcommand */
-  const char *name;
-  /* [out] matching subcommand */
-  struct argparse_handle *match;
-};
-
-/*
- * list walker callback arguments to compare
- * and find any required argument that has not been
- * given by the user
- */
-struct argparse_check_req_opt_args {
-  argparse_t ap;
-  struct argparse_option *opt;
-};
-
-/*
- * list walker callback arguments to find an argument 
- * associated with a given option
- */
-struct argparse_find_arg_for_opt_args {
-  struct argparse_option *opt;
-  struct argparse_item *item;
-};
-
-/*
- * list walker callback arguments to add flags that
- * are "false" to the arguments list
- */
-struct argparse_add_unset_flag_args {
-  argparse_t ap;
-};
-
-/*
  * Parser state machine internal state
  */
 struct argparse_parser_state {
@@ -151,23 +82,17 @@ struct argparse_parser_state {
   struct argparse_handle *root_cmd;
 };
 
+#define HELP_INDENT_BLOCK "\t"
+
 /* static functions */
 static int argparse_subcommand_ctor(void **itmdata, void *data);
 static int argparse_subcommand_dtor(void *data);
 static int argparse_options_ctor(void **itmdata, void *data);
 static int argparse_options_dtor(void *data);
 static int argparse_item_dtor(void *data);
-static int argparse_destroy_subcmd(void *data, void *args);
-static int argparse_cmp_arg(void *data, void *args);
-static int argparse_cmp_opt(void *data, void *args);
-static int argparse_find_arg_for_opt(void *data, void *args);
-static int argparse_check_req_opt(void *data, void *args);
-static int argparse_add_unset_flag(void *data, void *args);
-static int argparse_help_subcommand(void *data, void *args);
-static int argparse_help_posoption(void *data, void *args);
-static int argparse_help_option(void *data, void *args);
-static void argparse_subcommand_helpmsg(argparse_t ap);
-static int argparse_helpmsg_cbk(void *data, void *args);
+
+static void argparse_help_subcommand(struct argparse_handle *ap,
+				     int nest_level);
 static void argparse_copyout_arg(struct argparse_item *item,
 				 void *buf, int bufsize);
 static int argparse_parseopt(struct argparse_item *item, char *arg);
@@ -175,13 +100,10 @@ static int argparse_parse_posarg(struct argparse_parser_state *st);
 static int argparse_parse_arg_named(struct argparse_parser_state *st);
 static int argparse_check_required(struct argparse_parser_state *st);
 static int argparse_fixup_flags(struct argparse_parser_state *st);
-static int argparse_find_subcommand(void *data, void *args);
 static int argparse_next_subcmd(struct argparse_parser_state *st);
 static int argparse_prev_subcmd(struct argparse_parser_state *st);
 static int argparse_finalize_subcmd(struct argparse_parser_state *st);
 static int argparse_finalize_pop_subcmd(struct argparse_parser_state *st);
-
-
 
 /**
  * Subcommand constructor.
@@ -198,21 +120,21 @@ argparse_subcommand_ctor(void **itmdata, void *data)
 
   error = list_init(&sub->subcommands, argparse_subcommand_ctor,
 		    argparse_subcommand_dtor);
-  if (error)
+  if (error == UTILS_ERROR)
     goto err_sub;
   error = list_init(&sub->args, NULL, argparse_item_dtor);
-  if (error)
+  if (error == UTILS_ERROR)
     goto err_args;
   error = list_init(&sub->pos_args, NULL, argparse_item_dtor);
-  if (error)
+  if (error == UTILS_ERROR)
     goto err_posargs;
   error = list_init(&sub->options, argparse_options_ctor,
 		    argparse_options_dtor);
-  if (error)
+  if (error == UTILS_ERROR)
     goto err_options;
   error = list_init(&sub->pos_options, argparse_options_ctor,
 		    argparse_options_dtor);
-  if (error)
+  if (error == UTILS_ERROR)
     goto err_posopts;
   sub->curr_posarg = 0;
   sub->bin_name = NULL;
@@ -238,14 +160,26 @@ static int
 argparse_subcommand_dtor(void *data)
 {
   struct argparse_handle *sub = (struct argparse_handle *)data;
-  int error = 0;
+  bool have_error;
+  int error;
 
   /* NOTE: sub->subcommands is destroyed by argparse_destroy_subcmd */
   xlog_debug(logger, "Destroy %s\n", sub->subcommand_name);
   error = list_destroy(sub->args);
-  error |= list_destroy(sub->pos_args);
-  error |= list_destroy(sub->options);
-  error |= list_destroy(sub->pos_options);
+  if (error != UTILS_OK)
+    have_error = true;
+  error = list_destroy(sub->pos_args);
+  if (error != UTILS_OK)
+    have_error = true;
+  error = list_destroy(sub->options);
+  if (error != UTILS_OK)
+    have_error = true;
+  error = list_destroy(sub->pos_options);
+  if (error != UTILS_OK)
+    have_error = true;
+  error = list_destroy(sub->subcommands);
+  if (error != UTILS_OK)
+    have_error = true;
   if (sub->subcommand_name != NULL)
     free(sub->subcommand_name);
   if (sub->subcommand_help != NULL)
@@ -253,10 +187,10 @@ argparse_subcommand_dtor(void *data)
   /* NOTE bin_name is assumed to come from argv, so
    * do not deallocate.
    */
-  if (error)
-    return ARGPARSE_ERROR;
+  if (have_error)
+    return UTILS_ERROR;
   free(sub);
-  return ARGPARSE_OK;
+  return UTILS_OK;
 }
 
 /**
@@ -273,7 +207,7 @@ argparse_options_ctor(void **itmdata, void *data)
 
   opt_item = malloc(sizeof(struct argparse_option));
   if (opt_item == NULL)
-    return ARGPARSE_ERROR;
+    return UTILS_ERROR;
   /* copy non-pointer fields */
   opt_item->type = opt->type;
   opt_item->shortname = opt->shortname;
@@ -290,13 +224,13 @@ argparse_options_ctor(void **itmdata, void *data)
   strcpy(opt_item->help, opt->help);
 
   *itmdata = opt_item;
-  return ARGPARSE_OK;
+  return UTILS_OK;
   
  err_help:  
   free(opt_item->name);
  err_name:
   free(opt_item);
-  return ARGPARSE_ERROR;
+  return UTILS_ERROR;
 }
 
 /**
@@ -329,246 +263,64 @@ argparse_item_dtor(void *data)
 }
 
 /**
- * Callback that deallocates subcommands in a subcommand list
- * *args is unused
- */
-static int
-argparse_destroy_subcmd(void *data, void *args)
-{
-  struct argparse_handle *sub = (struct argparse_handle *)data;
-  int error;
-  
-  error = list_walk(sub->subcommands, argparse_destroy_subcmd, NULL);
-  error |= list_destroy(sub->subcommands);
-  return error;
-}
-
-/**
- * Callback for searching an argument in an argparse_item list
- */
-static int
-argparse_cmp_arg(void *data, void *args)
-{
-  struct argparse_item *itm = data;
-  struct argparse_cmp_args *cmp_args = args;
-
-  if (itm->opt == NULL)
-    return -1; /* XXX: change to error.h */
-  
-  if (strcmp(itm->opt->name, cmp_args->name) == 0) {
-    cmp_args->data = data;
-    return 1; /* stop iteration */
-  }
-  return ARGPARSE_OK;
-}
-
-/**
- * Callback for searching an argument in an argparse_options list
- */
-static int
-argparse_cmp_opt(void *data, void *args)
-{
-  struct argparse_option *opt = data;
-  struct argparse_opt_cmp_args *cmp_args = args;
-
-  bool match_longname = (cmp_args->longname != NULL &&
-			strlen(cmp_args->longname) > 0 &&
-			strcmp(opt->name, cmp_args->longname) == 0);
-  bool match_shortname =  (opt->shortname != '\0' &&
-			   opt->shortname == cmp_args->shortname);
-  if (match_longname || match_shortname) {
-    cmp_args->data = data;
-    return 1; /* stop iteration */
-  }
-  return ARGPARSE_OK;
-}
-
-/**
- * Callback for finding an argument associated with a given option
- */
-static int
-argparse_find_arg_for_opt(void *data, void *args)
-{
-  struct argparse_item *itm = data;
-  struct argparse_find_arg_for_opt_args *find_args = args;
-  
-  if (itm->opt == find_args->opt) {
-    find_args->item = itm;
-    return 1;
-  }
-  return ARGPARSE_OK;
-}
-
-/**
- * Callback for searching for missing required arguments.
- * When a required option is not specified in the arglist the
- * req_opt_args->opt is set to that option an the iteration is stopped.
- * if all required options are specified the req_opt_args->opt field is
- * set to NULL.
- */
-static int
-argparse_check_req_opt(void *data, void *args)
-{
-  struct argparse_option *opt = data;
-  struct argparse_check_req_opt_args *check_args = args;
-  struct argparse_find_arg_for_opt_args find_args;
-  int err;
-
-  check_args->opt = NULL;
-
-  /* if this option is required, check that there is at least one argument
-   * for that option.
-   */
-  if (opt->required) {
-    find_args.opt = opt;
-    find_args.item = NULL;
-    /* find first occurrenct of argument with opt as parsed option */
-    err = list_walk(check_args->ap->args, argparse_find_arg_for_opt,
-		    &find_args);
-    /* if the argument is found, err is 0 and 
-     * find_args->item != NULL 
-     */
-    if (err)
-      return -1; /* abort */
-    if (find_args.item == NULL) {
-      /* no args found, stop iterating */
-      check_args->opt = opt;
-      return 1;
-    }
-  }
-  return ARGPARSE_OK; /* keep iterating */
-}
-
-/**
- * Callback that adds a "false" flag argument for a FLAG option if
- * no argument for that option is already set.
- */
-static int
-argparse_add_unset_flag(void *data, void *args)
-{
-  struct argparse_option *opt = data;
-  struct argparse_add_unset_flag_args *walk_args = args;
-  struct argparse_find_arg_for_opt_args find_args;
-  struct argparse_item *item;
-  int err;
-
-  if (opt->type == T_FLAG) {
-    find_args.opt = opt;
-    find_args.item = NULL;
-    err = list_walk(walk_args->ap->args, argparse_find_arg_for_opt,
-		    &find_args);
-    if (err)
-      return -1; /* abort */
-    if (find_args.item == NULL) {
-      /* create missing argument */
-      item = malloc(sizeof(struct argparse_item));
-      if (item == NULL)
-	return ARGPARSE_ERROR;
-      item->opt = opt;
-      item->int_arg = 0;
-      err = list_push(walk_args->ap->args, item);
-      if (err) {
-	free(item);
-	return -1;
-      }
-    }
-  }
-  return ARGPARSE_OK;
-}
-
-/**
- * Callback that prints the help message for an option to stderr
- */
-static int
-argparse_help_option(void *data, void *args)
-{
-  struct argparse_option *opt = data;
-
-  if (opt->shortname == '\0')
-    xlog_msg(logger, "\t--%s\t\t%s\n", opt->name, opt->help);
-  else
-    xlog_msg(logger, "\t-%c,--%s\t\t%s\n", opt->shortname,
-	     opt->name, opt->help);
-  return ARGPARSE_OK;
-}
-
-/**
- * Callback that prints the help message for a positional 
- * argument to stderr
- */
-static int
-argparse_help_posoption(void *data, void *args)
-{
-  struct argparse_option *opt = data;
-
-  xlog_msg(logger, "\t%s\t\t\t%s\n", opt->name, opt->help);
-  return ARGPARSE_OK;
-}
-
-/**
- * Callback that prints the help message for all
- * the subcommands in a subcommand list
- */
-static int
-argparse_help_subcommand(void *data, void *args)
-{
-  struct argparse_handle *ap = data;
-
-  xlog_msg(logger, "\t%s\t\t%s\n", ap->subcommand_name, ap->subcommand_help);
-  return ARGPARSE_OK;
-}
-
-/**
- * Callback that finds a subcommand with a 
- * matching name
- */
-static int
-argparse_find_subcommand(void *data, void *args)
-{
-  struct argparse_handle *ap = data;
-  struct argparse_find_subcommand_args *find_args = args;
-  if (strcmp(ap->subcommand_name, find_args->name) == 0) {
-    /* found */
-    find_args->match = ap;
-    return 1; /* stop iteration */
-  }
-  return ARGPARSE_OK;
-}
-
-/**
- * Display help message for a subcommand, with command name,
- * subcommands summary, options and arguments.
+ * Display help for a subcommand recursively
+ * 
+ * @param[in] ap: the subcommand to show
+ * @param[in] nest_level: indentation level
  */
 static void
-argparse_subcommand_helpmsg(argparse_t ap)
+argparse_help_subcommand(struct argparse_handle *ap, int nest_level)
 {
+  list_iter_struct_t iter;
+  struct argparse_option *opt;
+  struct argparse_handle *sub;
+  int i;
+
+#define PRINT_INDENT(n)				\
+  for (i = 0; i < n; i++)			\
+    xlog_msg(stdlogger, HELP_INDENT_BLOCK)
+
+  PRINT_INDENT(nest_level);
+
   if (ap->subcommand_name == NULL)
-    /* root subcommand */
-    xlog_msg(logger, "Usage: %s [options] [subcommands] [arguments]\n",
+    /* root parser */
+    xlog_msg(stdlogger, "Usage: %s [options] [subcommands] [arguments]\n",
 	     ap->bin_name);
   else
-    xlog_msg(logger, "Command: %s [options] [subcommands] [arguments]\n%s\n",
+    xlog_msg(stdlogger, "%s [options] [subcommands] [arguments]\n%s\n",
 	     ap->subcommand_name, ap->subcommand_help);
-  /* print help for each option */
-  xlog_msg(logger, "Subcommands:\n");
-  list_walk(ap->subcommands, argparse_help_subcommand, NULL);
-  xlog_msg(logger, "Options:\n");
-  list_walk(ap->options, argparse_help_option, NULL);
-  xlog_msg(logger, "\nArguments:\n");
-  list_walk(ap->pos_options, argparse_help_posoption, NULL);
-  xlog_msg(logger, "\n\n");
-}
 
-/**
- * Callback for walking the subcommand tree.
- * Reuse the same function that prints help
- * for the root subcommand recursively.
- */
-static int
-argparse_helpmsg_cbk(void *data, void *args)
-{
-  argparse_helpmsg((struct argparse_handle *)data);
-  return ARGPARSE_OK;
+    PRINT_INDENT(nest_level);
+    xlog_msg(stdlogger, "Options:\n");
+    for (list_iter_init(ap->options, &iter); ! list_iter_end(&iter);
+	 list_iter_next(&iter)) {
+      opt = list_iter_data(&iter);
+      PRINT_INDENT(nest_level + 1);
+      if (opt->shortname == '\0')
+	xlog_msg(stdlogger, "--%s\t\t%s\n", opt->name, opt->help);
+      else
+	xlog_msg(stdlogger, "-%c,--%s\t\t%s\n", opt->shortname,
+		 opt->name, opt->help);
+    }
+    xlog_msg(stdlogger, "\n");
+    PRINT_INDENT(nest_level);
+    xlog_msg(stdlogger, "Arguments:\n");
+    for (list_iter_init(ap->pos_options, &iter); ! list_iter_end(&iter);
+	 list_iter_next(&iter)) {
+      opt = list_iter_data(&iter);
+      PRINT_INDENT(nest_level + 1);
+      xlog_msg(stdlogger, "%s\t\t\t%s\n", opt->name, opt->help);
+    }
+    xlog_msg(stdlogger, "\n");
+    PRINT_INDENT(nest_level);
+    xlog_msg(stdlogger, "Subcommands:\n");
+    for (list_iter_init(ap->subcommands, &iter); ! list_iter_end(&iter);
+	 list_iter_next(&iter)) {
+      sub = list_iter_data(&iter);
+      argparse_help_subcommand(sub, nest_level + 1);
+    }
+    xlog_msg(stdlogger, "\n\n");
+#undef PRINT_INDENT
 }
 
 /**
@@ -580,8 +332,7 @@ argparse_helpmsg_cbk(void *data, void *args)
 void
 argparse_helpmsg(argparse_t ap)
 {
-  argparse_subcommand_helpmsg(ap);
-  list_walk(ap->subcommands, argparse_helpmsg_cbk, NULL);
+  argparse_help_subcommand(ap, 0);
 }
 
 /**
@@ -597,16 +348,20 @@ argparse_init(argparse_t *pap, const char *help, argconsumer_t cbk,
   if (!argparse_initialized) {
     /* Initialize the logger if not set up already */
     log_init(logger, NULL);
+    log_init(stdlogger, NULL);
 #ifdef DEBUG
     log_option_set(logger, LOG_OPT_LEVEL, LOG_OPT_LEVEL_DEBUG);
 #else /* ! DEBUG */
     log_option_set(logger, LOG_OPT_LEVEL, LOG_OPT_LEVEL_ERR);
 #endif /* ! DEBUG */
+    log_option_set(stdlogger, LOG_OPT_LEVEL, LOG_OPT_LEVEL_ERR);
     log_option_set(logger, LOG_OPT_PREFIX, "argparse");
+    log_option_set(stdlogger, LOG_OPT_PREFIX, "");
+    log_option_set(stdlogger, LOG_OPT_MSG_FMT, "%s%s");
   }
 
   if (pap == NULL)
-    return -1;
+    return ARGPARSE_ERROR;
 
   ap = malloc(sizeof(struct argparse_handle));
   if (ap == NULL)
@@ -637,16 +392,16 @@ argparse_init(argparse_t *pap, const char *help, argconsumer_t cbk,
 int
 argparse_destroy(argparse_t ap)
 {
-  int error = 0;
-  /* error is used as an accumulator to check
-   * that all destructors return zero
-   */
+  int error;
+
   assert(ap != NULL);
+
   xlog_debug(logger, "Destroy root %s\n", ap->subcommand_name);
-  error = list_walk(ap->subcommands, argparse_destroy_subcmd, NULL);
-  error |= list_destroy(ap->subcommands);
-  error |= argparse_subcommand_dtor(ap);
-  return error;
+  error = argparse_subcommand_dtor(ap);
+
+  if (error == UTILS_ERROR)
+    return ARGPARSE_ERROR;
+  return ARGPARSE_OK;
 }
 
 /*
@@ -656,7 +411,7 @@ int
 argparse_reset(argparse_t ap)
 {
   int rc;
-  list_iter_t subcommands;
+  list_iter_struct_t subcommands;
   struct argparse_handle *sub;
 
   assert(ap != NULL);
@@ -679,26 +434,18 @@ argparse_reset(argparse_t ap)
   }
   ap->curr_posarg = 0;
 
-  subcommands = list_iter(ap->subcommands);
-  if (subcommands == NULL) {
-    xlog_err(logger, "Can not create subcommands iterator for %s\n",
-	     ap->subcommand_name);
-    return ARGPARSE_ERROR;
-  }
-  while (! list_iter_end(subcommands)) {
-    sub = list_iter_item(subcommands);
+
+  for (list_iter_init(ap->subcommands, &subcommands);
+       ! list_iter_end(&subcommands); list_iter_next(&subcommands)) {
+    sub = list_iter_data(&subcommands);
     if (sub == NULL) {
       xlog_err(logger, "Invalid subcommand\n");
       return ARGPARSE_ERROR;
     }
     rc = argparse_reset(sub);
-    if (rc == ARGPARSE_ERROR) {
-      list_iter_free(subcommands);
-      return rc;
-    }
-    list_iter_next(subcommands);
+    if (rc == ARGPARSE_ERROR)
+      return ARGPARSE_ERROR;
   }
-  list_iter_free(subcommands);
   return ARGPARSE_OK;
 }
 
@@ -824,21 +571,23 @@ argparse_copyout_arg(struct argparse_item *item, void *buf, int bufsize)
 int
 argparse_arg_get(argparse_t ap, const char *name, void *arg, int bufsize)
 {
-  struct argparse_cmp_args cmp_args;
-  int error;
+  list_iter_struct_t iter;
+  struct argparse_item *itm;
 
   assert(ap != NULL);
 
-  cmp_args.name = name;
-  cmp_args.data = NULL;
-  
-  error = list_walk(ap->args, argparse_cmp_arg, &cmp_args);
-  if (error)
-    return (error);
-  if (cmp_args.data == NULL)
+  for (list_iter_init(ap->args, &iter); !list_iter_end(&iter);
+       list_iter_next(&iter)) {
+    itm = list_iter_data(&iter);
+    if (itm->opt == NULL)
+      return ARGPARSE_ERROR;
+    
+    if (strcmp(itm->opt->name, name) == 0)
+      break;
+  }
+  if (list_iter_end(&iter))
     return ARGPARSE_NOARG;
-
-  argparse_copyout_arg(cmp_args.data, arg, bufsize);
+  argparse_copyout_arg(itm, arg, bufsize);
   return ARGPARSE_OK;
 }
 
@@ -852,7 +601,7 @@ argparse_posarg_get(argparse_t ap, int idx, void *arg, int bufsize)
 
   assert(ap != NULL);
 
-  item = list_getitem(ap->pos_args, idx);
+  item = list_get(ap->pos_args, idx);
   if (item == NULL)
     return ARGPARSE_NOARG;
 
@@ -907,7 +656,7 @@ argparse_parse_posarg(struct argparse_parser_state *st)
   struct argparse_handle *ap = st->current_cmd;
 
   arg = st->argv[st->index++];
-  opt = list_getitem(ap->pos_options, ap->curr_posarg);
+  opt = list_get(ap->pos_options, ap->curr_posarg);
 
   if (opt == NULL) {
     xlog_err(logger, "Extra positional argument %s\n", arg);
@@ -946,8 +695,9 @@ argparse_parse_posarg(struct argparse_parser_state *st)
 static int
 argparse_parse_arg_named(struct argparse_parser_state *st)
 {
-  struct argparse_opt_cmp_args cmp_args;
   struct argparse_item *item;
+  struct argparse_option *opt;
+  list_iter_struct_t iter;
   int error, is_longopt;
   char *arg;
   struct argparse_handle *ap = st->current_cmd;
@@ -967,21 +717,20 @@ argparse_parse_arg_named(struct argparse_parser_state *st)
     argparse_helpmsg(st->root_cmd);
     return ARGPARSE_ERROR;
   }
-  
-  if (is_longopt) {
-    cmp_args.shortname = '\0';
-    cmp_args.longname = arg;
+
+  for (list_iter_init(ap->options, &iter); !list_iter_end(&iter);
+       list_iter_next(&iter)) {
+    opt = list_iter_data(&iter);
+    if (is_longopt) {
+      if (strcmp(opt->name, arg) == 0)
+	break;
+    }
+    else {
+      if (opt->shortname == *arg)
+	break;
+    }
   }
-  else {
-    cmp_args.shortname = *arg;
-    cmp_args.longname = NULL;
-  }
-  cmp_args.data = NULL;
-  
-  error = list_walk(ap->options, argparse_cmp_opt, &cmp_args);
-  if (error < 0)
-    return (error);
-  if (cmp_args.data == NULL) {
+  if (list_iter_end(&iter)) {
     xlog_err(logger, "Invalid option -%s\n", arg);
     argparse_helpmsg(st->root_cmd);
     return ARGPARSE_ERROR;
@@ -990,7 +739,7 @@ argparse_parse_arg_named(struct argparse_parser_state *st)
   item = malloc(sizeof(struct argparse_item));
   if (item == NULL)
     return ARGPARSE_ERROR;
-  item->opt = cmp_args.data;
+  item->opt = opt;
 
   /* get next argument, holding the value for the option being parsed */
   if (item->opt->type == T_FLAG) {
@@ -1023,43 +772,53 @@ argparse_parse_arg_named(struct argparse_parser_state *st)
   return ARGPARSE_ERROR;
 }
 
+/**
+ * Check that all required arguments have been specified
+ * for the current parser
+ */
 static int
 argparse_check_required(struct argparse_parser_state *st)
 {
-  int err, num_opts;
-  struct argparse_check_req_opt_args cmp_args;
+  int num_opts;
+  list_iter_struct_t iter_args;
+  list_iter_struct_t iter_opts;
   struct argparse_option *opt;
+  struct argparse_item *itm;
   struct argparse_handle *ap = st->current_cmd;
   
   num_opts = list_length(ap->pos_options);
   xlog_debug(logger, "check required opts for %s\n", ap->subcommand_name);
   if (ap->curr_posarg != num_opts) {
     if (ap->curr_posarg < num_opts) {
-      opt = list_getitem(ap->pos_options, ap->curr_posarg);
+      opt = list_get(ap->pos_options, ap->curr_posarg);
       xlog_err(logger, "Missing argument %s\n", opt->name);
       argparse_helpmsg(st->root_cmd);
     }
     return ARGPARSE_ERROR;
   }
-  
-  cmp_args.ap = ap;
-  cmp_args.opt = NULL;
 
-  err = list_walk(ap->options, argparse_check_req_opt, &cmp_args);
-  if (err == 0) {
-    if (cmp_args.opt == NULL)
-      return ARGPARSE_OK;
-    else {
-      /* missing item found */
-      xlog_err(logger, "Missing required argument %s\n", cmp_args.opt->name);
-      argparse_helpmsg(st->root_cmd);
-      return ARGPARSE_ERROR;
+  for (list_iter_init(ap->options, &iter_opts); ! list_iter_end(&iter_opts);
+       list_iter_next(&iter_opts)) {
+    opt = list_iter_data(&iter_opts);
+    /*  check that there is at least one argument for a required option */
+    if (opt->required) {
+      for (list_iter_init(ap->args, &iter_args); ! list_iter_end(&iter_args);
+	   list_iter_next(&iter_args)) {
+	itm = list_iter_data(&iter_args);
+	if (itm->opt == opt)
+	  break;
+      }
+      if (list_iter_end(&iter_args))
+	break;
     }
   }
-  else
+  if (! list_iter_end(&iter_opts)) {
+    /* if the search stopped, we found a required option without args */
+    xlog_err(logger, "Missing required argument %s\n", opt->name);
+    argparse_helpmsg(st->root_cmd);
     return ARGPARSE_ERROR;
-
-  /* not reached */
+  }
+  return ARGPARSE_OK;
 }
 
 /**
@@ -1069,18 +828,42 @@ static int
 argparse_fixup_flags(struct argparse_parser_state *st)
 {
   int err;
-  struct argparse_add_unset_flag_args walk_args;
+  list_iter_struct_t iter_args;
+  list_iter_struct_t iter_opts;
+  struct argparse_option *opt;
+  struct argparse_item *item;
   struct argparse_handle *ap = st->current_cmd;
 
   xlog_debug(logger, "fixup flags for %s\n", ap->subcommand_name);
-  walk_args.ap = ap;
 
   /* iterate over flag options, if an argument is not specified for them,
    * create one
    */
-  err = list_walk(ap->options, argparse_add_unset_flag, &walk_args);
-  if (err < 0)
-    return ARGPARSE_ERROR;
+  for (list_iter_init(ap->options, &iter_opts); ! list_iter_end(&iter_opts);
+       list_iter_next(&iter_opts)) {
+    opt = list_iter_data(&iter_opts);
+    if (opt->type == T_FLAG) {
+      for (list_iter_init(ap->args, &iter_args); ! list_iter_end(&iter_args);
+	   list_iter_next(&iter_args)) {
+	item = list_iter_data(&iter_args);
+	if (item->opt == opt)
+	  break;
+      }
+      if (list_iter_end(&iter_args)) {
+	/* create missing argument */
+	item = malloc(sizeof(struct argparse_item));
+	if (item == NULL)
+	  return ARGPARSE_ERROR;
+	item->opt = opt;
+	item->int_arg = 0;
+	err = list_push(ap->args, item);
+	if (err) {
+	  free(item);
+	  return ARGPARSE_ERROR;
+	}
+      }
+    }
+  }
   return ARGPARSE_OK;
 }
 
@@ -1090,25 +873,31 @@ argparse_fixup_flags(struct argparse_parser_state *st)
 static int
 argparse_next_subcmd(struct argparse_parser_state *st)
 {
+  list_iter_struct_t iter;
+  struct argparse_handle *ap = st->current_cmd;
+  char *next_name;
+  struct argparse_handle *next;
   int error;
-  struct argparse_find_subcommand_args args;
 
-  args.name = st->argv[st->index++];
-  args.match = NULL;
+  next_name = st->argv[st->index++];
 
-  error = list_walk(st->current_cmd->subcommands,
-		    argparse_find_subcommand,
-		    &args);
-  xlog_debug(logger, "subcommand switch %s -> %s @ %p\n",
-	     st->current_cmd->subcommand_name, args.name, args.match);
-  if (error < 0 || args.match == NULL) {
-    xlog_err(logger, "Invalid command %s\n", args.name);
+  for (list_iter_init(ap->subcommands, &iter); ! list_iter_end(&iter);
+       list_iter_next(&iter)) {
+    next = list_iter_data(&iter);
+    if (strcmp(next->subcommand_name, next_name) == 0)
+      break;
+  }
+  if (list_iter_end(&iter)) {
+    /* not found */
+    xlog_err(logger, "Invalid command %s\n", next_name);
     return ARGPARSE_ERROR;
   }
-  error = list_push(st->subcmd_stack, st->current_cmd);
+  xlog_debug(logger, "subcommand switch %s -> %s @ %p\n",
+	     ap->subcommand_name, next_name, next);
+  error = list_push(st->subcmd_stack, ap);
   if (error)
     return ARGPARSE_ERROR;
-  st->current_cmd = args.match;
+  st->current_cmd = next;;
 
   return ARGPARSE_OK;
 }

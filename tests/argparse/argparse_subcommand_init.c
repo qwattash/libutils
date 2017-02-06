@@ -47,31 +47,31 @@ test_subcommand_options(void **state)
    * initialized *state, they should be independant
    */
   err = argparse_arg_add(sub, "arg1", 'a', T_STRING, "", false);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   err = argparse_arg_add(sub, "arg2", 'b', T_INT, "", false);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   err = argparse_arg_add(sub, "arg3", 'c', T_FLAG, "", false);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   err = argparse_posarg_add(sub, "pos1", T_STRING, "");
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   err = argparse_posarg_add(sub, "pos2", T_INT, "");
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   
   nested = argparse_subcmd_add(sub, "my_nested", "help msg", NULL, NULL);
   assert_non_null(nested);
 
   err = argparse_arg_add(nested, "arg1", 'a', T_STRING, "", false);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   err = argparse_arg_add(nested, "arg2", 'b', T_INT, "", false);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   err = argparse_arg_add(nested, "arg3", 'c', T_FLAG, "", false);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   err = argparse_posarg_add(nested, "pos1", T_STRING, "");
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   err = argparse_posarg_add(nested, "pos2", T_INT, "");
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   
 }
 

@@ -22,18 +22,18 @@ ap_setup(void **state)
   argparse_t ap;
 
   err = argparse_init(&ap, "Test parser", NULL, NULL);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   err = argparse_arg_add(ap, "arg1", 'a', T_STRING, "", false);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   err = argparse_arg_add(ap, "arg2", 'b', T_INT, "", false);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   err = argparse_arg_add(ap, "arg3", 'c', T_FLAG, "", false);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   err = argparse_posarg_add(ap, "pos1", T_STRING, "");
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   err = argparse_posarg_add(ap, "pos2", T_INT, "");
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   *state = ap;
   return 0;
@@ -47,7 +47,7 @@ ap_setup_empty(void **state)
   argparse_t ap;
 
   err = argparse_init(&ap, "Test parser", NULL, NULL);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   *state = ap;
   return 0;
@@ -56,7 +56,13 @@ ap_setup_empty(void **state)
 static int
 ap_teardown(void **state)
 {
-  return argparse_destroy(*state);
+  int err;
+
+  err = argparse_destroy(*state);
+
+  if (err != ARGPARSE_OK)
+    return 1;
+  return 0;
 }
 
 #endif

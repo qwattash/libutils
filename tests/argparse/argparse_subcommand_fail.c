@@ -33,15 +33,15 @@ test_ap_parse_fail_required(void **state)
 			    subcommand_options_cbk, NULL);
   assert_non_null(sub);
   err = argparse_arg_add(*state, "req", 'r', T_STRING, "", true);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   err = argparse_arg_add(sub, "sub_req", 'r', T_STRING, "", true);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   err = argparse_arg_add(sub, "arg2", 'b', T_INT, "", false);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   err = argparse_posarg_add(sub, "pos1", T_STRING, "");
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   err = argparse_parse(*state, argc, argv);
   assert_int_equal(err, ARGPARSE_ERROR);
@@ -80,10 +80,10 @@ test_ap_parse_fail_extra_posarg(void **state)
   assert_non_null(sub);
 
   err = argparse_arg_add(sub, "arg2", 'b', T_INT, "", false);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   err = argparse_posarg_add(sub, "pos1", T_STRING, "");
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   err = argparse_parse(*state, argc, argv);
   assert_int_equal(err, ARGPARSE_ERROR);
@@ -120,12 +120,12 @@ test_ap_parse_fail_posarg_type(void **state)
   assert_non_null(sub);
 
   err = argparse_arg_add(sub, "arg2", 'b', T_INT, "", false);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   err = argparse_posarg_add(sub, "pos1", T_STRING, "");
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   err = argparse_posarg_add(sub, "pos2", T_INT, "");
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   err = argparse_parse(*state, argc, argv);
   assert_int_equal(err, ARGPARSE_ERROR);
@@ -151,10 +151,10 @@ test_ap_parse_empty(void **state)
   assert_non_null(sub);
 
   err = argparse_arg_add(sub, "arg2", 'b', T_INT, "", false);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   err = argparse_posarg_add(sub, "pos1", T_STRING, "");
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   err = argparse_parse(*state, argc, argv);
   assert_int_equal(err, ARGPARSE_ERROR);

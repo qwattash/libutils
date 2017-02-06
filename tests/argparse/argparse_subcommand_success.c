@@ -29,46 +29,46 @@ check_args(argparse_t root, argparse_t sub, enum check_args_opt opt)
   if (opt == ONLY_REQUIRED)
     assert_int_equal(err, ARGPARSE_NOARG);
   else {
-    assert_int_equal(err, 0);
+    assert_int_equal(err, ARGPARSE_OK);
     assert_string_equal(strarg, "foo");
   }
   err = argparse_arg_get(root, "arg2", &intarg, 0);
   if (opt == ONLY_REQUIRED)
     assert_int_equal(err, ARGPARSE_NOARG);
   else {
-    assert_int_equal(err, 0);
+    assert_int_equal(err, ARGPARSE_OK);
     assert_int_equal(intarg, 10);
   }
   err = argparse_arg_get(root, "arg3", &flag, 0);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   if (opt == ONLY_REQUIRED)
     assert_int_equal(flag, false);
   else
     assert_int_equal(flag, true);
   err = argparse_posarg_get(root, 0, &strarg, 64);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   assert_string_equal(strarg, "pos1");
   err = argparse_posarg_get(root, 1, &intarg, 0);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   assert_int_equal(intarg, 10);
   /* subcommand args */
   err = argparse_arg_get(sub, "arg1", strarg, 64);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   assert_string_equal(strarg, "sub_foo");
   err = argparse_arg_get(sub, "arg2", &intarg, 0);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   assert_int_equal(intarg, 100);
   err = argparse_arg_get(sub, "arg3", &flag, 0);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   if (opt == NO_FLAG || opt == ONLY_REQUIRED)
     assert_int_equal(flag, false);
   else
     assert_int_equal(flag, true);
   err = argparse_posarg_get(sub, 0, &strarg, 64);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   assert_string_equal(strarg, "sub_pos1");
   err = argparse_posarg_get(sub, 1, &intarg, 0);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   assert_int_equal(intarg, 100);
 }
 
@@ -112,19 +112,19 @@ test_subcommand_options_parse(void **state)
 			    subcommand_options_cbk, NULL);
   assert_non_null(sub);
   err = argparse_arg_add(sub, "arg1", 'a', T_STRING, "", false);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   err = argparse_arg_add(sub, "arg2", 'b', T_INT, "", false);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   err = argparse_arg_add(sub, "arg3", 'c', T_FLAG, "", false);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   err = argparse_posarg_add(sub, "pos1", T_STRING, "");
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   err = argparse_posarg_add(sub, "pos2", T_INT, "");
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   err = argparse_parse(*state, argc, argv);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   
   assert_int_equal(subcommand_options_cbk_count, 1); /* check that it has been called */
   subcommand_options_cbk_count = 0;
@@ -161,19 +161,19 @@ test_subcommand_required(void **state)
 			    subcommand_options_cbk, NULL);
   assert_non_null(sub);
   err = argparse_arg_add(sub, "arg1", 'a', T_STRING, "", true);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   err = argparse_arg_add(sub, "arg2", 'b', T_INT, "", true);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   err = argparse_arg_add(sub, "arg3", 'c', T_FLAG, "", false);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   err = argparse_posarg_add(sub, "pos1", T_STRING, "");
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   err = argparse_posarg_add(sub, "pos2", T_INT, "");
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   err = argparse_parse(*state, argc, argv);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   
   assert_int_equal(subcommand_options_cbk_count, 1); /* check that it has been called */
   subcommand_options_cbk_count = 0;
@@ -216,19 +216,19 @@ test_subcommand_unset_flag(void **state)
 			    subcommand_options_cbk, NULL);
   assert_non_null(sub);
   err = argparse_arg_add(sub, "arg1", 'a', T_STRING, "", false);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   err = argparse_arg_add(sub, "arg2", 'b', T_INT, "", false);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   err = argparse_arg_add(sub, "arg3", 'c', T_FLAG, "", false);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   err = argparse_posarg_add(sub, "pos1", T_STRING, "");
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   err = argparse_posarg_add(sub, "pos2", T_INT, "");
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   err = argparse_parse(*state, argc_flags, argv_flags);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   
   assert_int_equal(subcommand_options_cbk_count, 1); /* check that it has been called */
   subcommand_options_cbk_count = 0;
@@ -246,18 +246,18 @@ test_posargs_only_in_subcmd(void **state)
   char *argv[] = {"./a.out", "my_subcmd", "foo"};
 
   err = argparse_init(&ap, "Test parser", NULL, NULL);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   sub = argparse_subcmd_add(ap, "my_subcmd", "Help msg", NULL, NULL);
   assert_non_null(sub);
 
   err = argparse_posarg_add(sub, "pos1", T_STRING, "");
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   err = argparse_parse(ap, argc, argv);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   err = argparse_posarg_get(sub, 0, foo, 10);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   assert_string_equal(foo, "foo");
 
   argparse_destroy(ap);
@@ -272,19 +272,19 @@ test_ap_nested_parser_success(void **state)
 
   char *argv[] = {"./a.out", "cmd1", "cmd2", "-o", "option"};
   err = argparse_init(&ap, "Test parser", NULL, NULL);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   c1 = argparse_subcmd_add(ap, "cmd1", "Command 1", NULL, NULL);
   c2 = argparse_subcmd_add(c1, "cmd2", "Command 2", NULL, NULL);
 
   err = argparse_arg_add(c2, "option", 'o', T_STRING, "Option", false);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   
   err = argparse_parse(ap, 5, argv);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   err = argparse_arg_get(c2, "option", strarg, 10);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   assert_string_equal(strarg, "option");
 
   argparse_destroy(ap);
@@ -299,24 +299,24 @@ test_ap_nested_parser_posargs_success(void **state)
 
   char *argv[] = {"./a.out", "cmd1", "cmd2", "posarg1", "posarg2"};
   err = argparse_init(&ap, "Test parser", NULL, NULL);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   c1 = argparse_subcmd_add(ap, "cmd1", "Command 1", NULL, NULL);
   c2 = argparse_subcmd_add(c1, "cmd2", "Command 2", NULL, NULL);
 
   err = argparse_posarg_add(c2, "pos1", T_STRING, "");
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   err = argparse_posarg_add(c2, "pos2", T_STRING, "");
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   
   err = argparse_parse(ap, 5, argv);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
 
   err = argparse_posarg_get(c2, 0, strarg, 64);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   assert_string_equal(strarg, "posarg1");
   err = argparse_posarg_get(c2, 1, strarg, 64);
-  assert_int_equal(err, 0);
+  assert_int_equal(err, ARGPARSE_OK);
   assert_string_equal(strarg, "posarg2");
 
   argparse_destroy(ap);
