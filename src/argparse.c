@@ -286,9 +286,13 @@ argparse_help_subcommand(struct argparse_handle *ap, int nest_level)
     /* root parser */
     xlog_msg(stdlogger, "Usage: %s [options] [subcommands] [arguments]\n",
 	     ap->bin_name);
-  else
-    xlog_msg(stdlogger, "%s [options] [subcommands] [arguments]\n%s\n",
-	     ap->subcommand_name, ap->subcommand_help);
+  else {
+    xlog_msg(stdlogger, "%s [options] [subcommands] [arguments]\n",
+	     ap->subcommand_name);
+    PRINT_INDENT(nest_level);
+    xlog_msg(stdlogger, "%s\n", ap->subcommand_help);
+  }
+  
 
     PRINT_INDENT(nest_level);
     xlog_msg(stdlogger, "Options:\n");
