@@ -93,6 +93,27 @@ test_list_delete(void **state)
   assert_int_equal(dtor_count, 4);
 }
 
+/**
+ * Try to destroy a list with only a single element
+ * and check that the destructor is called.
+ */
+static void
+test_list_destroy_one(void **state)
+{
+  int err;
+
+  dtor_count = 0;
+
+  err = list_insert(*state, "0", 0);
+  assert_int_equal(err, UTILS_OK);
+  assert_int_equal(list_length(*state), 1);
+  assert_int_equal(dtor_count, 0);
+
+  err = list_destroy(*state);
+  assert_int_equal(err, UTILS_OK);
+  assert_int_equal(dtor_count, 1);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -104,6 +125,7 @@ main(int argc, char *argv[])
     cmocka_unit_test_setup_teardown(test_list_insert_remove,
 				    setup_list_empty,
 				    teardown_list),
+    cmocka_unit_test_setup(test_list_destroy_one, setup_list_empty),
   };
   return cmocka_run_group_tests(tests, NULL, NULL);
 }

@@ -173,6 +173,7 @@ const enum log_backend log_opt_backend_bubble;
 /* public logging API */
 #ifdef ENABLE_LOGGING
 
+#define log_handle_s(name) static logger_t name
 #define log_handle(name) logger_t name
 #define log_init(hnd, parent) _log_init(hnd, parent)
 #define log_option_set(hnd, opt, value) _log_option_set(hnd, opt, value)
@@ -201,7 +202,8 @@ const enum log_backend log_opt_backend_bubble;
 
 #else /* ! ENABLE_LOGGING */
 
-#define log_handle(name) 
+#define log_handle_s(name) (void)0
+#define log_handle(name) (void)0
 #define log_init(hnd, parent) (void)0
 #define log_option_set(hnd, opt, value) (void)0
 

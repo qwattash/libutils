@@ -69,13 +69,13 @@ list_destroy(list_t handle)
 
   if (handle->base != NULL) {
     curr = handle->base;
-    while (curr->next != handle->base) {
+    do {
       if (handle->dtor != NULL)
 	handle->dtor(curr->data);
       next = curr->next;
       free(curr);
       curr = next;
-    }
+    } while (curr != handle->base);
   }
   free(handle);
   return UTILS_OK;
