@@ -1,4 +1,6 @@
 /**
+ * @file
+ * Logging API.
  * The logger is handled by a layered hierarchy of
  * loggers. Each logger have the same handle properties
  * and log messages are propagated up in the logger chain.

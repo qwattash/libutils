@@ -1,5 +1,7 @@
-/*
- * Simple argument parser library
+/**
+ * @file
+ * Simple argument parser library implementation.
+ * See argparse.h for API specification.
  */
 
 #include <stdio.h>

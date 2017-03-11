@@ -1,5 +1,7 @@
 /**
- * Generic list implementation
+ * @file
+ * Generic list implementation.
+ * See list.h for API specification
  */
 
 #include <stdlib.h>

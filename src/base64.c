@@ -1,5 +1,7 @@
 /**
- * Base64 encoder and decoder
+ * @file
+ * Base64 encoder and decoder.
+ * See base64.h for API specification.
  */
 
 #include <stdio.h>

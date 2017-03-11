@@ -1,5 +1,11 @@
-/*
- * Simple argument parser library
+/**
+ * @file
+ * Argument parser library.
+ * The argument parser allows to dynamically define a parser for command-line
+ * style argument processing.
+ * Basic support for type validation of arguments is provided.
+ * Arbitrarily nested subcommands and automatic help-message generation
+ * are supported.
  */
 
 #ifndef ARGPARSE_H

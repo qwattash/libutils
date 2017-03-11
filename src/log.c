@@ -1,4 +1,8 @@
-
+/**
+ * @file
+ * Logging internal implementation
+ * See log.h for API specification
+ */
 #include <assert.h>
 #include <stdarg.h>
 #include <string.h>
