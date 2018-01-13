@@ -357,25 +357,21 @@ list_iter_seek(list_iter_t iter, int index)
   if (iter->list->base == NULL) {
     return UTILS_ERROR;
   }
+  
+  if (iter->list->len <= index) {
+    /* Can not seek out of bound index */
+    iter->end = true;
+    return UTILS_ERROR;
+  }
+
+  for (position = 0, curr = iter->list->base; position < index; position++)
+    curr = curr->next;
+
   if (index == 0)
     /* In this case the iterator resets and the guard item resets too */
     iter->guard = NULL;
   else
     iter->guard = iter->list->base;
-
-  position = 0;
-  curr = iter->list->base;
-
-  while (curr != iter->guard && position < index) {
-    curr = curr->next;
-    position++;
-  }
-
-  if (curr == iter->guard) {
-    /* Can not seek out of bound index */
-    iter->end = true;
-    return UTILS_ERROR;
-  }
 
   iter->cursor = curr;
   iter->end = false;

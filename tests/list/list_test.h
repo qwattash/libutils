@@ -85,6 +85,25 @@ setup_list_3(void **state)
 }
 
 static int
+setup_list_1(void **state)
+{
+  list_t lst;
+  int err;
+
+  ctor_count = 0;
+  dtor_count = 0;
+
+  err = list_init(&lst, ctor, dtor);
+  if (err)
+    return err;
+  err = list_push(lst, "0");
+  if (err)
+    return err;
+  *state = lst;
+  return 0;
+}
+
+static int
 teardown_list(void **state)
 {
   int err;
