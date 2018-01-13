@@ -162,7 +162,7 @@ static int
 argparse_subcommand_dtor(void *data)
 {
   struct argparse_handle *sub = (struct argparse_handle *)data;
-  bool have_error;
+  bool have_error = false;
   int error;
 
   /* NOTE: sub->subcommands is destroyed by argparse_destroy_subcmd */
@@ -189,9 +189,9 @@ argparse_subcommand_dtor(void *data)
   /* NOTE bin_name is assumed to come from argv, so
    * do not deallocate.
    */
+  free(sub);
   if (have_error)
     return UTILS_ERROR;
-  free(sub);
   return UTILS_OK;
 }
 
